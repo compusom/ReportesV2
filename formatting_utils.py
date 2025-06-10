@@ -2,9 +2,12 @@
 import pandas as pd
 import numpy as np
 import re
-import locale 
+import locale
 from datetime import datetime, date, timedelta
-from utils import robust_numeric_conversion # De utils.py local
+import logging
+from utils import robust_numeric_conversion  # De utils.py local
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -131,32 +134,52 @@ def _format_dataframe_to_markdown(df, title, log_func, float_cols_fmt={}, int_co
 
     for col in headers:
         if col in cols_fmt:
-             fmt, param = cols_fmt[col]
-             try:
-                 is_numeric_format = fmt in ['float', 'int', 'pct', 'stability', 'currency']
-                 is_numeric_dtype = pd.api.types.is_numeric_dtype(df_formatted[col])
-                 if is_numeric_format and not is_numeric_dtype:
-                     # Aquí robust_numeric_conversion se importa desde utils, pero debe estar disponible
-                     converted_col = df_formatted[col].apply(robust_numeric_conversion)
-                 else:
-                      converted_col = df_formatted[col].copy()
-                 if fmt=='float': df_formatted[col]=converted_col.apply(lambda x:fmt_float(x,param))
-                 elif fmt=='int': df_formatted[col]=converted_col.apply(fmt_int)
-                 elif fmt=='pct': df_formatted[col]=converted_col.apply(lambda x:fmt_pct(x,param))
-                 elif fmt=='stability': df_formatted[col]=converted_col.apply(fmt_stability)
-                 elif fmt=='currency': df_formatted[col]=converted_col.apply(lambda x:f"{param}{fmt_float(x,default_prec)}" if pd.notna(x) and np.isfinite(x) else '-')
-             except Exception as e_apply_fmt:
-                 print(f"Adv: Error applying format '{fmt}' to column '{col}': {e_apply_fmt}. Column might have unexpected data types.")
+            fmt, param = cols_fmt[col]
+            try:
+                is_numeric_format = fmt in ['float', 'int', 'pct', 'stability', 'currency']
+                is_numeric_dtype = pd.api.types.is_numeric_dtype(df_formatted[col])
+                if is_numeric_format and not is_numeric_dtype:
+                    # Aquí robust_numeric_conversion se importa desde utils, pero debe estar disponible
+                    converted_col = df_formatted[col].apply(robust_numeric_conversion)
+                else:
+                    converted_col = df_formatted[col].copy()
+                if fmt == 'float':
+                    df_formatted[col] = converted_col.apply(lambda x: fmt_float(x, param))
+                elif fmt == 'int':
+                    df_formatted[col] = converted_col.apply(fmt_int)
+                elif fmt == 'pct':
+                    df_formatted[col] = converted_col.apply(lambda x: fmt_pct(x, param))
+                elif fmt == 'stability':
+                    df_formatted[col] = converted_col.apply(fmt_stability)
+                elif fmt == 'currency':
+                    df_formatted[col] = converted_col.apply(
+                        lambda x: f"{param}{fmt_float(x, default_prec)}" if pd.notna(x) and np.isfinite(x) else '-'
+                    )
+            except Exception as e_apply_fmt:
+                logger.warning(
+                    "Adv: Error applying format '%s' to column '%s': %s. Column might have unexpected data types.",
+                    fmt,
+                    col,
+                    e_apply_fmt,
+                )
 
     for col in headers:
         try:
             df_formatted[col] = df_formatted[col].apply(lambda x: str(x) if pd.notna(x) else '-')
         except Exception as e_final_str:
-            print(f"FATAL Adv: Error in final str conversion for column '{col}': {e_final_str}. Attempting list comprehension fallback.")
+            logger.error(
+                "FATAL Adv: Error in final str conversion for column '%s': %s. Attempting list comprehension fallback.",
+                col,
+                e_final_str,
+            )
             try:
                  df_formatted[col] = [str(item) if pd.notna(item) else '-' for item in df_formatted[col].values]
             except Exception as e_list_comp:
-                 print(f"FATAL Adv: List comprehension str conversion failed for '{col}': {e_list_comp}. Column might be corrupted.")
+                 logger.error(
+                     "FATAL Adv: List comprehension str conversion failed for '%s': %s. Column might be corrupted.",
+                     col,
+                     e_list_comp,
+                 )
                  df_formatted[col] = [f"!!!Error in {col}!!!" for _ in range(len(df_formatted))]
 
     col_widths={};
@@ -172,8 +195,12 @@ def _format_dataframe_to_markdown(df, title, log_func, float_cols_fmt={}, int_co
                     width = min(width, max_col_width)
                 col_widths[orig_h]=width
             except Exception as e_width:
-                 print(f"Adv: Error calculating string width for column '{orig_h}': {type(df_formatted[orig_h]).__name__} object has no attribute 'str'. Using header length.")
-                 col_widths[orig_h] = len(clean_h)
+                logger.warning(
+                    "Adv: Error calculating string width for column '%s': %s object has no attribute 'str'. Using header length.",
+                    orig_h,
+                    type(df_formatted[orig_h]).__name__,
+                )
+                col_widths[orig_h] = len(clean_h)
 
     h_parts=[];s_parts=[]
     for clean_h in clean_headers:
