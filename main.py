@@ -6,64 +6,99 @@
 import sys
 import os
 import traceback
+import logging
 
 # --- INICIO DE MODIFICACIÓN PARA RESOLVER ModuleNotFoundError ---
 current_script_directory = os.path.dirname(os.path.abspath(__file__))
 if current_script_directory not in sys.path:
     sys.path.insert(0, current_script_directory)
 
-print(f"DEBUG: main.py __file__: {__file__}")
-print(f"DEBUG: current_script_directory (debe ser la raíz de tu proyecto): {current_script_directory}")
-print("DEBUG: sys.path ANTES de importar data_processing:")
+from config import DEBUG_MODE  # configure logging level
+
+logging.basicConfig(
+    level=logging.DEBUG if DEBUG_MODE else logging.INFO,
+    format="%(levelname)s:%(name)s:%(message)s",
+)
+
+logger = logging.getLogger(__name__)
+
+logger.debug("main.py __file__: %s", __file__)
+logger.debug(
+    "current_script_directory (debe ser la raíz de tu proyecto): %s",
+    current_script_directory,
+)
+logger.debug("sys.path ANTES de importar data_processing:")
 for p_path in sys.path:
-    print(f"  - {p_path}")
+    logger.debug("  - %s", p_path)
 
 # --- VERIFICACIÓN EXHAUSTIVA DE LA CARPETA DATA_PROCESSING ---
-print("\nDEBUG: Verificando la carpeta 'data_processing'...")
+logger.debug("\nDEBUG: Verificando la carpeta 'data_processing'...")
 data_processing_path_expected = os.path.join(current_script_directory, "data_processing")
-print(f"DEBUG: Ruta esperada para data_processing: {data_processing_path_expected}")
+logger.debug("DEBUG: Ruta esperada para data_processing: %s", data_processing_path_expected)
 
 if os.path.isdir(data_processing_path_expected):
-    print("DEBUG: OK - La ruta es un directorio.")
+    logger.debug("DEBUG: OK - La ruta es un directorio.")
     init_py_path_expected = os.path.join(data_processing_path_expected, "__init__.py")
-    print(f"DEBUG: Ruta esperada para __init__.py: {init_py_path_expected}")
+    logger.debug("DEBUG: Ruta esperada para __init__.py: %s", init_py_path_expected)
     if os.path.isfile(init_py_path_expected):
-        print("DEBUG: OK - El archivo __init__.py existe.")
+        logger.debug("DEBUG: OK - El archivo __init__.py existe.")
         try:
             import importlib.util
             spec = importlib.util.spec_from_file_location("data_processing", init_py_path_expected)
             if spec and spec.loader:
                 dp_module_test = importlib.util.module_from_spec(spec)
                 spec.loader.exec_module(dp_module_test) # type: ignore
-                print(f"DEBUG: OK - Prueba de carga de 'data_processing' (via __init__.py) exitosa: {dp_module_test}")
+                logger.debug(
+                    "DEBUG: OK - Prueba de carga de 'data_processing' (via __init__.py) exitosa: %s",
+                    dp_module_test,
+                )
             else:
-                print("FATAL DEBUG: No se pudo obtener la especificación o el cargador para data_processing/__init__.py.")
+                logger.error(
+                    "FATAL DEBUG: No se pudo obtener la especificación o el cargador para data_processing/__init__.py."
+                )
         except Exception as e_init_test:
-            print(f"FATAL DEBUG: Error durante la prueba de carga de data_processing/__init__.py: {e_init_test}")
+            logger.error(
+                "FATAL DEBUG: Error durante la prueba de carga de data_processing/__init__.py: %s",
+                e_init_test,
+            )
             traceback.print_exc()
     else:
-        print("FATAL DEBUG: ERROR - El archivo __init__.py NO existe en la ruta esperada.")
-        print("             Por favor, crea un archivo vacío llamado '__init__.py' (dos guiones bajos al inicio y al final)")
-        print(f"             dentro de la carpeta: {data_processing_path_expected}")
+        logger.error("FATAL DEBUG: ERROR - El archivo __init__.py NO existe en la ruta esperada.")
+        logger.error(
+            "             Por favor, crea un archivo vacío llamado '__init__.py' (dos guiones bajos al inicio y al final)"
+        )
+        logger.error("             dentro de la carpeta: %s", data_processing_path_expected)
 else:
-    print("FATAL DEBUG: ERROR - La carpeta 'data_processing' NO existe en la ruta esperada o no es un directorio.")
-    print("             Por favor, asegúrate de que la carpeta se llama exactamente 'data_processing' (todo en minúsculas, con guion bajo)")
-    print(f"             y está ubicada en: {current_script_directory}")
+    logger.error(
+        "FATAL DEBUG: ERROR - La carpeta 'data_processing' NO existe en la ruta esperada o no es un directorio."
+    )
+    logger.error(
+        "             Por favor, asegúrate de que la carpeta se llama exactamente 'data_processing' (todo en minúsculas, con guion bajo)"
+    )
+    logger.error("             y está ubicada en: %s", current_script_directory)
 
-print("\nDEBUG: Listado de la carpeta raíz del proyecto:")
+logger.debug("\nDEBUG: Listado de la carpeta raíz del proyecto:")
 try:
     for item in os.listdir(current_script_directory):
-        print(f"  - {item} {'(DIR)' if os.path.isdir(os.path.join(current_script_directory, item)) else '(FILE)'}")
+        logger.debug(
+            "  - %s %s",
+            item,
+            "(DIR)" if os.path.isdir(os.path.join(current_script_directory, item)) else "(FILE)",
+        )
 except Exception as e_listdir_root:
-    print(f"  ERROR listando directorio raíz: {e_listdir_root}")
+    logger.error("  ERROR listando directorio raíz: %s", e_listdir_root)
 
 if os.path.isdir(data_processing_path_expected):
-    print(f"\nDEBUG: Listado de la carpeta '{data_processing_path_expected}':")
+    logger.debug("\nDEBUG: Listado de la carpeta '%s':", data_processing_path_expected)
     try:
         for item in os.listdir(data_processing_path_expected):
-            print(f"  - {item} {'(DIR)' if os.path.isdir(os.path.join(data_processing_path_expected, item)) else '(FILE)'}")
+            logger.debug(
+                "  - %s %s",
+                item,
+                "(DIR)" if os.path.isdir(os.path.join(data_processing_path_expected, item)) else "(FILE)",
+            )
     except Exception as e_listdir_dp:
-        print(f"  ERROR listando directorio data_processing: {e_listdir_dp}")
+        logger.error("  ERROR listando directorio data_processing: %s", e_listdir_dp)
 # --- FIN VERIFICACIÓN EXHAUSTIVA ---
 
 
@@ -71,18 +106,18 @@ if os.path.isdir(data_processing_path_expected):
 procesar_reporte_rendimiento_func = None
 procesar_reporte_bitacora_func = None
 try:
-    print("\nDEBUG: Intentando: from data_processing.orchestrators import ...")
+    logger.debug("\nDEBUG: Intentando: from data_processing.orchestrators import ...")
     from data_processing.orchestrators import procesar_reporte_rendimiento, procesar_reporte_bitacora
     procesar_reporte_rendimiento_func = procesar_reporte_rendimiento
     procesar_reporte_bitacora_func = procesar_reporte_bitacora
-    print("DEBUG: Importación de orchestrators A NIVEL DE MODULO exitosa.")
+    logger.debug("DEBUG: Importación de orchestrators A NIVEL DE MODULO exitosa.")
 except ModuleNotFoundError as e_mnfe:
-    print(f"FATAL DEBUG (Importación Nivel Módulo): ModuleNotFoundError: {e_mnfe}")
+    logger.error("FATAL DEBUG (Importación Nivel Módulo): ModuleNotFoundError: %s", e_mnfe)
 except ImportError as e_ie:
-    print(f"FATAL DEBUG (Importación Nivel Módulo): ImportError: {e_ie}")
+    logger.error("FATAL DEBUG (Importación Nivel Módulo): ImportError: %s", e_ie)
     traceback.print_exc()
 except Exception as e_ge:
-    print(f"FATAL DEBUG (Importación Nivel Módulo): Exception: {e_ge}")
+    logger.error("FATAL DEBUG (Importación Nivel Módulo): Exception: %s", e_ge)
     traceback.print_exc()
 # --- FIN Intento de importación INMEDIATO ---
 
@@ -112,9 +147,9 @@ warnings.filterwarnings('ignore', r'invalid value encountered')
 try:
     from dateutil.relativedelta import relativedelta
     from dateutil.parser import parse as date_parse
-    print("INFO: dateutil importado OK.")
+    logger.info("INFO: dateutil importado OK.")
 except ImportError:
-    print("¡ERROR! Falta 'python-dateutil'. Instala con: pip install python-dateutil")
+    logger.error("¡ERROR! Falta 'python-dateutil'. Instala con: pip install python-dateutil")
     relativedelta = None
     date_parse = None
 
@@ -124,27 +159,27 @@ from tkinter import ttk, simpledialog, filedialog, messagebox, scrolledtext
 try:
     import sv_ttk
 except ImportError:
-    print("Advertencia: sv_ttk no encontrado.")
+    logger.warning("Advertencia: sv_ttk no encontrado.")
     sv_ttk = None
 
 try:
     from tkcalendar import Calendar
-    print("INFO: tkcalendar OK.")
+    logger.info("INFO: tkcalendar OK.")
 except ImportError:
-    print("¡ADVERTENCIA! Falta 'tkcalendar'. El selector de calendario no estará disponible.")
-    print("Instala con: pip install tkcalendar")
+    logger.warning("¡ADVERTENCIA! Falta 'tkcalendar'. El selector de calendario no estará disponible.")
+    logger.warning("Instala con: pip install tkcalendar")
     Calendar = None
 
 try:
     _tk_test_root = tk.Tk()
     _tk_test_root.withdraw()
     _tk_test_root.destroy()
-    print("INFO: tkinter OK.")
+    logger.info("INFO: tkinter OK.")
 except NameError:
-    print("FATAL: tkinter alias 'tk' no definido.");
+    logger.critical("FATAL: tkinter alias 'tk' no definido.")
     sys.exit()
 except Exception as e:
-    print(f"INFO: Problema tkinter ({e}). Continuando...")
+    logger.info("INFO: Problema tkinter (%s). Continuando...", e)
 
 log_summary_messages = []
 
@@ -161,9 +196,9 @@ class ReportApp:
         if 'sv_ttk' in globals() and sv_ttk:
             try:
                 sv_ttk.set_theme("light")
-                print("INFO: Tema sv-ttk 'light' aplicado.")
+                logger.info("INFO: Tema sv-ttk 'light' aplicado.")
             except Exception as e_svttk:
-                print(f"Adv: sv_ttk ({e_svttk}). Fallback.")
+                logger.warning("Adv: sv_ttk (%s). Fallback.", e_svttk)
                 self._apply_standard_theme()
         else:
             self._apply_standard_theme()
@@ -301,9 +336,12 @@ class ReportApp:
         available=self.style.theme_names(); preferred=['vista','clam','default']
         for t_theme in preferred:
             if t_theme in available:
-                try: self.style.theme_use(t_theme); print(f"INFO: Tema ttk: '{t_theme}'"); return
+                try:
+                    self.style.theme_use(t_theme)
+                    logger.info("INFO: Tema ttk: '%s'", t_theme)
+                    return
                 except tk.TclError: continue
-        print("Adv: No se pudo aplicar tema ttk preferido.")
+        logger.warning("Adv: No se pudo aplicar tema ttk preferido.")
 
     def _set_default_filename(self):
         rt = self.report_type.get()
@@ -381,7 +419,7 @@ class ReportApp:
                 else:
                     self.lbl_monthly_info.config(text="(No hay suficientes datos para meses)")
             except Exception as e_month_count:
-                print(f"Error contando meses para GUI: {e_month_count}")
+                logger.error("Error contando meses para GUI: %s", e_month_count)
                 self.lbl_monthly_info.config(text="(No se pudo determinar el número de meses)")
         else:
              self.lbl_monthly_info.config(text="")
@@ -565,8 +603,12 @@ class ReportApp:
                                  except Exception: df_temp_peek = pd.read_csv(f_path, dtype=str, sep=sep_peek, engine='python', encoding=enc_peek, on_bad_lines='skip', nrows=20)
                              except Exception: pass 
 
-                    except Exception as e_peek: 
-                         print(f"Adv: Error reading peek data for entities in {os.path.basename(f_path)}: {e_peek}")
+                    except Exception as e_peek:
+                         logger.warning(
+                             "Adv: Error reading peek data for entities in %s: %s",
+                             os.path.basename(f_path),
+                             e_peek,
+                         )
 
                     if df_temp_peek is not None and not df_temp_peek.empty: 
                         file_cols_normalized = {c: normalize(c) for c in df_temp_peek.columns} 
@@ -588,11 +630,22 @@ class ReportApp:
                             for camp, adset in temp_df.drop_duplicates().itertuples(index=False): 
                                 all_campaign_adsets.add((camp, adset))
                         elif camp_col_orig:
-                             print(f"Adv: Columna Campaign '{camp_col_orig}' encontrada, pero AdSet no en '{os.path.basename(f_path)}' para detección de entidades.")
+                             logger.warning(
+                                 "Adv: Columna Campaign '%s' encontrada, pero AdSet no en '%s' para detección de entidades.",
+                                 camp_col_orig,
+                                 os.path.basename(f_path),
+                             )
                         elif adset_col_orig:
-                             print(f"Adv: Columna AdSet '{adset_col_orig}' encontrada, pero Campaign no en '{os.path.basename(f_path)}' para detección de entidades.")
+                             logger.warning(
+                                 "Adv: Columna AdSet '%s' encontrada, pero Campaign no en '%s' para detección de entidades.",
+                                 adset_col_orig,
+                                 os.path.basename(f_path),
+                             )
                         else:
-                             print(f"Adv: No se encontraron columnas Campaign/AdSet en '{os.path.basename(f_path)}' para detección de entidades.")
+                             logger.warning(
+                                 "Adv: No se encontraron columnas Campaign/AdSet en '%s' para detección de entidades.",
+                                 os.path.basename(f_path),
+                             )
             except NameError as ne_date:
                  self.status_queue.put(f"Error Fatal Interno: Función '{ne_date.name}' no encontrada.");
                  self.root.after(0,self._update_dates_mondays_and_entities_ui,None,None,0,[],[],[]) 
@@ -700,8 +753,10 @@ class ReportApp:
         try:
             while True:
                 self._handle_queue_message(self.status_queue.get_nowait())
-        except queue.Empty: pass
-        except Exception as e: print(f"Error checking queue: {e}")
+        except queue.Empty:
+            pass
+        except Exception as e:
+            logger.error("Error checking queue: %s", e)
         finally:
             if hasattr(self,'root') and self.root and self.root.winfo_exists():
                  self.root.after(100, self.check_queue)
@@ -715,7 +770,9 @@ class ReportApp:
         global procesar_reporte_rendimiento_func, procesar_reporte_bitacora_func 
         
         if procesar_reporte_rendimiento_func is None or procesar_reporte_bitacora_func is None:
-            print("FATAL: Funciones de procesamiento no se importaron correctamente al inicio (start_processing_thread).")
+            logger.critical(
+                "FATAL: Funciones de procesamiento no se importaron correctamente al inicio (start_processing_thread)."
+            )
             messagebox.showerror("Error Crítico", "Funciones de procesamiento no cargadas. Revise consola.")
             self._update_status("ERROR CRÍTICO: Fallo en importación inicial (detectado en start_processing_thread).")
             return
@@ -851,11 +908,18 @@ class ReportApp:
                        locale='es_ES' 
                        ) 
         if current_selection_date:
-            try: cal.selection_set(current_selection_date)
-            except Exception as e_cal_select_set: print(f"Advertencia: No se pudo preseleccionar fecha en calendario: {e_cal_select_set}")
+            try:
+                cal.selection_set(current_selection_date)
+            except Exception as e_cal_select_set:
+                logger.warning(
+                    "Advertencia: No se pudo preseleccionar fecha en calendario: %s",
+                    e_cal_select_set,
+                )
 
-        try: cal.config(firstweekday='monday')
-        except tk.TclError: print("Advertencia: No se pudo configurar 'firstweekday' en tkcalendar. Usando default.")
+        try:
+            cal.config(firstweekday='monday')
+        except tk.TclError:
+            logger.warning("Advertencia: No se pudo configurar 'firstweekday' en tkcalendar. Usando default.")
 
         if self.min_date_detected: cal.config(mindate=self.min_date_detected.date())
         if self.max_date_detected: cal.config(maxdate=self.max_date_detected.date())
@@ -930,7 +994,7 @@ class ReportApp:
 # PUNTO DE ENTRADA PRINCIPAL
 # ============================================================
 if __name__ == "__main__":
-    print(f"DEBUG: __main__ block - os.getcwd(): {os.getcwd()}")
+    logger.debug("DEBUG: __main__ block - os.getcwd(): %s", os.getcwd())
     try:
         if 'tk' not in globals(): raise NameError("'tk' no definido.")
         if relativedelta is None or date_parse is None:
@@ -939,13 +1003,19 @@ if __name__ == "__main__":
                  messagebox.showwarning("Dependencia Faltante", "¡Advertencia! Falta 'python-dateutil'.\n\nInstala con: pip install python-dateutil\n\nSin esta librería, las funciones de comparación mensual y la Bitácora Semanal podrían no funcionar correctamente.")
                  _warn_root.destroy()
              except Exception as e_warn:
-                 print("\nADVERTENCIA CRÍTICA: 'python-dateutil' no instalado o falló importación. Funciones de periodo (Bitácora, comp. mensual) podrían fallar.")
-                 print(f"(Error al mostrar advertencia GUI: {e_warn})")
+                 logger.error(
+                     "\nADVERTENCIA CRÍTICA: 'python-dateutil' no instalado o falló importación. Funciones de periodo (Bitácora, comp. mensual) podrían fallar."
+                 )
+                 logger.error("(Error al mostrar advertencia GUI: %s)", e_warn)
 
         root = tk.Tk(); app = ReportApp(root)
         root.update_idletasks()
         w_val=root.winfo_width();h_val=root.winfo_height();sw_val=root.winfo_screenwidth();sh_val=root.winfo_screenheight()
         cx_val=int(sw_val/2-w_val/2);cy_val=int(sh_val/2-h_val/2); root.geometry(f'{w_val}x{h_val}+{cx_val}+{cy_val}')
         root.mainloop()
-    except NameError as e_name: print(f"ERROR FATAL NameError: {e_name}"); traceback.print_exc()
-    except Exception as e_gui: print(f"ERROR FATAL GUI: {e_gui}"); traceback.print_exc()
+    except NameError as e_name:
+        logger.critical("ERROR FATAL NameError: %s", e_name)
+        traceback.print_exc()
+    except Exception as e_gui:
+        logger.critical("ERROR FATAL GUI: %s", e_gui)
+        traceback.print_exc()
