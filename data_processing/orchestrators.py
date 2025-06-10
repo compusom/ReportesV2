@@ -24,13 +24,13 @@ except ImportError:
 # Importaciones relativas para módulos dentro del mismo paquete 'data_processing'
 from .loaders import _cargar_y_preparar_datos
 from .aggregators import _agregar_datos_diarios
-from .metric_calculators import _calcular_dias_activos_totales
+from .metric_calculators import _calcular_dias_activos_totales, _calcular_entidades_activas_por_dia
 from .report_sections import (
     _generar_tabla_vertical_global, _generar_tabla_vertical_entidad,
     _generar_tabla_embudo_rendimiento, _generar_tabla_embudo_bitacora,
     _generar_analisis_ads, _generar_tabla_top_ads_historico,
-    _generar_tabla_bitacora_entidad,
-    _generar_tabla_bitacora_detallada
+    _generar_tabla_top_adsets_historico, _generar_tabla_top_campaigns_historico,
+    _generar_tabla_bitacora_entidad
 )
 
 # Importaciones de módulos en la raíz del proyecto
@@ -188,8 +188,12 @@ def procesar_reporte_rendimiento(input_files, output_dir, output_filename, statu
             except Exception as e_s6: log(f"\n!!! Error Sección 6 (Top Ads): {e_s6} !!!\n{traceback.format_exc()}",importante=True)
 
             log("\n\n============================================================");log("===== Resumen del Proceso =====");log("============================================================")
-            if log_summary_messages_orchestrator: [log(f"  - {re.sub(r'^\s*\[\d{2}:\d{2}:\d{2}\]\s*','',msg).strip().replace('---','-')}") for msg in log_summary_messages_orchestrator if re.sub(r'^\s*\[\d{2}:\d{2}:\d{2}\]\s*','',msg).strip()]
-            else: log("  No se generaron mensajes de resumen.")
+            if log_summary_messages_orchestrator:
+                for msg in log_summary_messages_orchestrator:
+                    clean_msg = re.sub(r'^\s*\[\d{2}:\d{2}:\d{2}\]\s*','', msg).strip().replace('---','-')
+                    log(f"  - {clean_msg}")
+            else:
+                log("  No se generaron mensajes de resumen.")
             log("============================================================")
             log("\n\n--- FIN DEL REPORTE RENDIMIENTO ---",importante=True); status_queue.put("---DONE---")
     except Exception as e_main:
@@ -265,11 +269,12 @@ def procesar_reporte_bitacora(input_files, output_dir, output_filename, status_q
                 status_queue.put("---ERROR---"); return
             log("Agregación diaria OK.")
 
-            try:
-                _generar_tabla_bitacora_detallada(df_daily_agg_full, detected_currency, log)
-            except Exception as e_det:
-                logger.error("Error generando tabla bitácora detallada: %s", e_det)
-                log(f"Adv: Error generando tabla Bitácora Detallada: {e_det}")
+            log("--- Calculando Días Activos ---")
+            active_days_results = _calcular_dias_activos_totales(df_combined)
+            active_days_campaign = active_days_results.get('Campaign', pd.DataFrame())
+            active_days_adset = active_days_results.get('AdSet', pd.DataFrame())
+            active_days_ad = active_days_results.get('Anuncio', pd.DataFrame())
+            active_entities_daily = _calcular_entidades_activas_por_dia(df_combined)
 
             min_date_overall = df_daily_agg_full['date'].min().date()
             max_date_overall = df_daily_agg_full['date'].max().date()
@@ -485,9 +490,26 @@ def procesar_reporte_bitacora(input_files, output_dir, output_filename, status_q
 
             _generar_tabla_embudo_bitacora(df_daily_total_for_bitacora, bitacora_periods_list, log, detected_currency, period_type=bitacora_comparison_type)
 
+            try:
+                _generar_tabla_top_ads_historico(df_daily_agg_full, active_days_ad, log, detected_currency, top_n=15, sort_by_roas=True)
+            except Exception as e_top_ads:
+                log(f"Adv: Error generando Top Ads: {e_top_ads}")
+            try:
+                _generar_tabla_top_adsets_historico(df_daily_agg_full, active_days_adset, log, detected_currency, top_n=15)
+            except Exception as e_top_as:
+                log(f"Adv: Error generando Top AdSets: {e_top_as}")
+            try:
+                _generar_tabla_top_campaigns_historico(df_daily_agg_full, active_days_campaign, log, detected_currency, top_n=15)
+            except Exception as e_top_camp:
+                log(f"Adv: Error generando Top Campañas: {e_top_camp}")
+
             log("\n\n============================================================");log(f"===== Resumen del Proceso (Bitácora {bitacora_comparison_type}) =====");log("============================================================")
-            if log_summary_messages_orchestrator: [log(f"  - {re.sub(r'^\s*\[\d{2}:\d{2}:\d{2}\]\s*','',msg).strip().replace('---','-')}") for msg in log_summary_messages_orchestrator if re.sub(r'^\s*\[\d{2}:\d{2}:\d{2}\]\s*','',msg).strip()]
-            else: log("  No se generaron mensajes de resumen.")
+            if log_summary_messages_orchestrator:
+                for msg in log_summary_messages_orchestrator:
+                    clean_msg = re.sub(r'^\s*\[\d{2}:\d{2}:\d{2}\]\s*','', msg).strip().replace('---','-')
+                    log(f"  - {clean_msg}")
+            else:
+                log("  No se generaron mensajes de resumen.")
             log("============================================================")
             log(f"\n\n--- FIN DEL REPORTE BITÁCORA ({bitacora_comparison_type}) ---", importante=True); status_queue.put("---DONE---")
 
