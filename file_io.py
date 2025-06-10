@@ -6,8 +6,11 @@ import csv
 import sys
 from datetime import date # Solo para el rango razonable de fechas
 import traceback # Para debugging
+import logging
 
 from utils import normalize, create_flexible_regex_pattern # De utils.py local
+
+logger = logging.getLogger(__name__)
 
 # Intenta importar date_parse de dateutil, pero no falles si no está
 try:
@@ -31,11 +34,17 @@ def find_date_column_name(file_path):
             try:
                 df_peek=pd.read_excel(file_path,engine=engine,dtype=str,nrows=0)
             except Exception as e_peek_excel:
-                print(f"  Adv: Peek Excel header falló ({e_peek_excel}), reintentando con skiprows=[1]")
+                logger.warning(
+                    "Adv: Peek Excel header falló (%s), reintentando con skiprows=[1]",
+                    e_peek_excel,
+                )
                 try:
                      df_peek=pd.read_excel(file_path,engine=engine,dtype=str,nrows=0, skiprows=[1])
                 except Exception as e_peek_excel_skip:
-                     print(f"  Adv: Peek Excel header con skiprows=[1] también falló ({e_peek_excel_skip})")
+                     logger.warning(
+                         "Adv: Peek Excel header con skiprows=[1] también falló (%s)",
+                         e_peek_excel_skip,
+                     )
                      return None
         elif ext=='.csv':
             sep_f=None; enc_f=None; encs=['utf-8-sig','latin-1','cp1252']; lines_f=None
@@ -56,14 +65,21 @@ def find_date_column_name(file_path):
             try:
                 df_peek=pd.read_csv(file_path,dtype=str,sep=sep_f,engine='python',encoding=enc_f,nrows=0)
             except pd.errors.ParserError:
-                 print(f"  Adv: Peek CSV header falló, reintentando con skiprows=[1]")
+                 logger.warning(
+                     "Adv: Peek CSV header falló, reintentando con skiprows=[1]"
+                 )
                  try:
                      df_peek=pd.read_csv(file_path,dtype=str,sep=sep_f,engine='python',encoding=enc_f,nrows=0,skiprows=[1])
                  except Exception as e_peek_csv_skip:
-                      print(f"  Adv: Peek CSV header con skiprows=[1] también falló ({e_peek_csv_skip})")
+                      logger.warning(
+                          "Adv: Peek CSV header con skiprows=[1] también falló (%s)",
+                          e_peek_csv_skip,
+                      )
                       return None
             except Exception as e_peek_csv:
-                 print(f"  Adv: Error inesperado al leer header CSV: {e_peek_csv}")
+                 logger.error(
+                     "Adv: Error inesperado al leer header CSV: %s", e_peek_csv
+                 )
                  return None
 
         if df_peek is None: return None
@@ -77,7 +93,13 @@ def find_date_column_name(file_path):
             for orig,norm_val in norm_cols.items():
                 if re.fullmatch(pat,norm_val,re.IGNORECASE) and orig in df_peek.columns: return orig
         return None
-    except Exception as e: print(f"Adv: Error general detectando col fecha ({os.path.basename(file_path)}): {e}"); return None
+    except Exception as e:
+        logger.error(
+            "Adv: Error general detectando col fecha (%s): %s",
+            os.path.basename(file_path),
+            e,
+        )
+        return None
 
 def get_dates_from_file(file_path, date_column_name):
     try:
@@ -93,11 +115,19 @@ def get_dates_from_file(file_path, date_column_name):
             try:
                 dates_series = pd.read_excel(file_path, engine=engine, usecols=[date_column_name], skiprows=skip_rows, dtype=str)[date_column_name]
             except (KeyError, IndexError, ValueError, pd.errors.EmptyDataError) as e:
-                 print(f"Adv: Leyendo fechas Excel con skiprows={skip_rows} falló ({e}) en {os.path.basename(file_path)}. Reintentando sin skiprows...");
+                 logger.warning(
+                     "Adv: Leyendo fechas Excel con skiprows=%s falló (%s) en %s. Reintentando sin skiprows...",
+                     skip_rows,
+                     e,
+                     os.path.basename(file_path),
+                 )
                  try:
                      dates_series = pd.read_excel(file_path, engine=engine, usecols=[date_column_name], dtype=str)[date_column_name]
                  except Exception as e_noskip:
-                      print(f"Adv: Leer fechas Excel sin skiprows también falló ({e_noskip}).")
+                      logger.warning(
+                          "Adv: Leer fechas Excel sin skiprows también falló (%s)",
+                          e_noskip,
+                      )
                       return pd.Series(dtype='datetime64[ns]')
 
         elif ext == '.csv':
@@ -113,14 +143,20 @@ def get_dates_from_file(file_path, date_column_name):
                 except Exception: continue
 
             if not lines or not any(ln.strip() for ln in lines):
-                 print(f"Adv: CSV vacío o ilegible para detectar separador/encoding: {os.path.basename(file_path)}")
+                 logger.warning(
+                     "Adv: CSV vacío o ilegible para detectar separador/encoding: %s",
+                     os.path.basename(file_path),
+                 )
                  return pd.Series(dtype='datetime64[ns]')
 
             sniffer = csv.Sniffer()
             content_line_for_sniffer = next((ln for ln in lines if ln.strip()), None)
 
             if not content_line_for_sniffer:
-                 print(f"Adv: No se encontró línea con contenido en CSV para sniffer: {os.path.basename(file_path)}")
+                 logger.warning(
+                     "Adv: No se encontró línea con contenido en CSV para sniffer: %s",
+                     os.path.basename(file_path),
+                 )
                  return pd.Series(dtype='datetime64[ns]')
             
             try:
@@ -130,16 +166,28 @@ def get_dates_from_file(file_path, date_column_name):
                 common_delimiters = [',', ';', '\t', '|']
                 counts = {s: content_line_for_sniffer.count(s) for s in common_delimiters}
                 sep = max(counts, key=counts.get) if any(c > 0 for c in counts.values()) else ','
-                print(f"Adv: Sniffer CSV falló en {os.path.basename(file_path)}, usando separador estimado: '{sep}'")
+                logger.info(
+                    "Adv: Sniffer CSV falló en %s, usando separador estimado: '%s'",
+                    os.path.basename(file_path),
+                    sep,
+                )
 
             try:
                 dates_series = pd.read_csv(file_path, usecols=[date_column_name], sep=sep, engine='python', encoding=enc, on_bad_lines='skip', dtype=str, skiprows=skip_rows)[date_column_name]
             except (KeyError, IndexError, ValueError, pd.errors.EmptyDataError, pd.errors.ParserError) as e:
-                 print(f"Adv: Leyendo fechas CSV con skiprows={skip_rows} falló ({e}) en {os.path.basename(file_path)}. Reintentando sin skiprows...");
+                 logger.warning(
+                     "Adv: Leyendo fechas CSV con skiprows=%s falló (%s) en %s. Reintentando sin skiprows...",
+                     skip_rows,
+                     e,
+                     os.path.basename(file_path),
+                 )
                  try:
                      dates_series = pd.read_csv(file_path, usecols=[date_column_name], sep=sep, engine='python', encoding=enc, on_bad_lines='skip', dtype=str)[date_column_name]
                  except Exception as e_noskip_csv:
-                     print(f"Adv: Leer fechas CSV sin skiprows también falló ({e_noskip_csv}).")
+                     logger.warning(
+                         "Adv: Leer fechas CSV sin skiprows también falló (%s)",
+                         e_noskip_csv,
+                     )
                      return pd.Series(dtype='datetime64[ns]')
 
         if dates_series is not None:
@@ -159,7 +207,11 @@ def get_dates_from_file(file_path, date_column_name):
                     parsed_dates_fmt = pd.to_datetime(dates_series, format=fmt_date, errors='coerce')
                     if not parsed_dates_fmt.isnull().all():
                         parsed_dates = parsed_dates_fmt
-                        print(f"  Info: Fechas parseadas con formato '{fmt_date}' para {os.path.basename(file_path)}")
+                        logger.info(
+                            "  Info: Fechas parseadas con formato '%s' para %s",
+                            fmt_date,
+                            os.path.basename(file_path),
+                        )
                         break
             
             if parsed_dates.isnull().all() and not dates_series.isnull().all() and date_parse is not None:
@@ -180,9 +232,16 @@ def get_dates_from_file(file_path, date_column_name):
                       temp_parsed_dates = pd.Series(parsed_dates_list, dtype='datetime64[ns]')
                       if not temp_parsed_dates.isnull().all():
                           parsed_dates = temp_parsed_dates
-                          print(f"  Info: Fechas parseadas con dateutil.parser para {os.path.basename(file_path)}")
+                          logger.info(
+                              "  Info: Fechas parseadas con dateutil.parser para %s",
+                              os.path.basename(file_path),
+                          )
                  except Exception as e_infer:
-                      print(f"Adv: dateutil.parser falló ({e_infer}) para {os.path.basename(file_path)}")
+                      logger.warning(
+                          "Adv: dateutil.parser falló (%s) para %s",
+                          e_infer,
+                          os.path.basename(file_path),
+                      )
             
             if parsed_dates.notnull().any():
                 min_year = date.today().year - 10
@@ -193,13 +252,29 @@ def get_dates_from_file(file_path, date_column_name):
                 )
                 filtered_count = parsed_dates.notnull().sum()
                 if original_parsed_count > 0 and filtered_count < original_parsed_count:
-                    print(f"  Adv: {original_parsed_count - filtered_count} fechas filtradas por estar fuera del rango ({min_year}-{max_year}) en {os.path.basename(file_path)}.")
+                    logger.info(
+                        "  Adv: %s fechas filtradas por estar fuera del rango (%s-%s) en %s.",
+                        original_parsed_count - filtered_count,
+                        min_year,
+                        max_year,
+                        os.path.basename(file_path),
+                    )
                 if parsed_dates.isnull().all() and not dates_series.isnull().all() and original_parsed_count > 0:
-                    print(f"  Adv: Todas las fechas parseadas para {os.path.basename(file_path)} están fuera del rango esperado ({min_year}-{max_year}).")
+                    logger.info(
+                        "  Adv: Todas las fechas parseadas para %s están fuera del rango esperado (%s-%s).",
+                        os.path.basename(file_path),
+                        min_year,
+                        max_year,
+                    )
 
             return parsed_dates
         return pd.Series(dtype='datetime64[ns]')
     except Exception as e:
-        print(f"Adv: Error general leyendo fechas {os.path.basename(file_path)} col '{date_column_name}': {e}")
+        logger.error(
+            "Adv: Error general leyendo fechas %s col '%s': %s",
+            os.path.basename(file_path),
+            date_column_name,
+            e,
+        )
         traceback.print_exc()
         return pd.Series(dtype='datetime64[ns]')

@@ -1,5 +1,14 @@
 # report_generator_project/config.py
-from utils import normalize # Suponiendo que normalize está en utils.py
+from utils import normalize  # Suponiendo que normalize está en utils.py
+import os
+import logging
+
+# Debug mode flag controlled via environment variable
+DEBUG_MODE = os.environ.get("DEBUG_MODE", "0") == "1"
+logging.basicConfig(
+    level=logging.DEBUG if DEBUG_MODE else logging.INFO,
+    format="%(levelname)s:%(name)s:%(message)s",
+)
 
 # ============================================================
 # CONFIGURACIÓN ESPECÍFICA DEL REPORTE

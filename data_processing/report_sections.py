@@ -4,6 +4,9 @@ import numpy as np
 import re # Para búsqueda de U{dias}
 import locale # Para nombres de meses
 from datetime import datetime, date, timedelta
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Intentar importar dateutil, pero es opcional para algunas funciones si no está
 try:
@@ -287,8 +290,11 @@ def _generar_tabla_vertical_entidad(entity_level, entity_name, dias_activos_tota
             continue
 
         info = metric_map.get(internal_key) 
-        if not info: 
-            print(f"Advertencia: No se encontró información para la métrica clave '{internal_key}' en metric_map.")
+        if not info:
+            logger.warning(
+                "Advertencia: No se encontró información para la métrica clave '%s' en metric_map.",
+                internal_key,
+            )
             continue
 
         key_m=info['key']; fmt=info['formatter']; mtype=info['type']; row=[disp_name_order]; glob_comp=np.nan
