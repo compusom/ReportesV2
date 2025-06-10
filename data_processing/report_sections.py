@@ -859,6 +859,10 @@ def _generar_tabla_top_ads_historico(df_daily_agg, active_days_total_ad_df, log_
     log_func("\n\n============================================================");log_func(f"===== 6. Top {top_n} Ads Histórico (Orden: {orden_desc}) =====");log_func("============================================================")
     group_cols_ad=['Anuncio']
     essential_cols = group_cols_ad + ['spend','impr']
+
+    group_cols_ad=['Campaign','AdSet','Anuncio'] 
+    essential_cols = group_cols_ad + ['spend','impr'] 
+
     if df_daily_agg is None or df_daily_agg.empty or not all(c_col in df_daily_agg.columns for c_col in essential_cols):
         log_func("   Faltan columnas esenciales (Campaign, AdSet, Anuncio, spend, impr) para Top Ads."); return
 
@@ -937,6 +941,10 @@ def _generar_tabla_top_ads_historico(df_daily_agg, active_days_total_ad_df, log_
         _format_dataframe_to_markdown(df_display,f"** Top {top_n} Ads por Gasto > ROAS (Global Acumulado) **",log_func,currency_cols=detected_currency, stability_cols=[], numeric_cols_for_alignment=num_cols)
     else: log_func(f"   No hay datos para mostrar en Top {top_n} Ads.");
     log_func("\n  **Detalle Top Ads Histórico:** Agrupa anuncios con el mismo nombre sumando sus métricas. Todas las métricas son acumuladas globales y el orden es por ROAS descendente.");
+
+    else: log_func(f"   No hay datos para mostrar en Top {top_n} Ads.");
+    log_func("\n  **Detalle Top Ads Histórico:** Muestra los anuncios con mejor rendimiento histórico, ordenados primero por mayor gasto total y luego por ROAS más alto. Todas las métricas son acumuladas globales.");
+
     log_func("  ---")
 
 def _generar_tabla_top_adsets_historico(df_daily_agg, active_days_adset_df, log_func, detected_currency, top_n=15):
