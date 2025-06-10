@@ -58,6 +58,33 @@ def _calcular_dias_activos_totales(df_combined):
            results['Anuncio'] = pd.DataFrame(columns=['Campaign','AdSet','Anuncio','Días_Activo_Total'])
     return results
 
+def _calcular_entidades_activas_por_dia(df_combined):
+    """Devuelve cuántas entidades estuvieron activas por día."""
+    cols=['date','Campaign','AdSet','Anuncio','Entrega']
+    if df_combined is None or df_combined.empty:
+        logger.warning("Adv: DF vacío (entidades activas por día).")
+        return pd.DataFrame(columns=['date','Campañas_Activas','AdSets_Activos','Ads_Activos'])
+    missing=[c for c in ['date','Entrega'] if c not in df_combined.columns]
+    if missing:
+        logger.warning("Adv: Faltan columnas %s (entidades activas por día).", missing)
+        return pd.DataFrame(columns=['date','Campañas_Activas','AdSets_Activos','Ads_Activos'])
+
+    df=df_combined[cols[0:5] if 'Anuncio' in df_combined.columns else cols[0:4] if 'AdSet' in df_combined.columns else cols[0:3]].copy()
+    if not pd.api.types.is_datetime64_any_dtype(df['date']):
+        df['date']=pd.to_datetime(df['date'],errors='coerce')
+    df=df[df['date'].notna()]
+    df=df[df['Entrega']=='Activo']
+    if df.empty:
+        logger.warning("Adv: No hay filas activas para contar por día.")
+        return pd.DataFrame(columns=['date','Campañas_Activas','AdSets_Activos','Ads_Activos'])
+    ads=df.groupby('date')['Anuncio'].nunique() if 'Anuncio' in df.columns else pd.Series(dtype=int)
+    adsets=df.groupby('date')['AdSet'].nunique() if 'AdSet' in df.columns else pd.Series(dtype=int)
+    camps=df.groupby('date')['Campaign'].nunique() if 'Campaign' in df.columns else pd.Series(dtype=int)
+    res=pd.concat([camps.rename('Campañas_Activas'), adsets.rename('AdSets_Activos'), ads.rename('Ads_Activos')], axis=1).fillna(0).astype(int)
+    res.reset_index(inplace=True)
+    logger.info("Entidades activas por día calculadas (%s fechas).", len(res))
+    return res
+
 def _calculate_stability_pct(series):
     series_num=pd.to_numeric(series,errors='coerce').dropna(); series_num=series_num[np.isfinite(series_num)]
     # ... (copiar el cuerpo completo de la función _calculate_stability_pct aquí)
