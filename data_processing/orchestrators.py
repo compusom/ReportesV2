@@ -31,7 +31,6 @@ from .report_sections import (
     _generar_analisis_ads, _generar_tabla_top_ads_historico,
     _generar_tabla_top_adsets_historico, _generar_tabla_top_campaigns_historico,
     _generar_tabla_bitacora_entidad
-=======
     _generar_tabla_bitacora_entidad,
     _generar_tabla_bitacora_detallada
 
