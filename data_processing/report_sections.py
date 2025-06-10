@@ -1087,3 +1087,59 @@ def _generar_tabla_bitacora_entidad(entity_level, entity_name, df_daily_entity,
     log_func("  ---")
     try: locale.setlocale(locale.LC_TIME, original_locale) 
     except: pass
+def _generar_tabla_bitacora_detallada(df_daily_agg, detected_currency, log_func):
+    """Genera una tabla diaria resumida para la bitácora."""
+    log_func("\n\n============================================================")
+    log_func("===== Bitácora Detallada por Día =====")
+    log_func("============================================================")
+    if df_daily_agg is None or df_daily_agg.empty or 'date' not in df_daily_agg.columns or df_daily_agg['date'].dropna().empty:
+        log_func("No hay datos diarios para la Bitácora Detallada.")
+        return
+    df_disp = df_daily_agg.copy()
+    try:
+        df_disp = df_disp[df_disp['date'].notna()].copy()
+        df_disp['date'] = pd.to_datetime(df_disp['date']).dt.strftime('%d/%m/%Y')
+    except Exception:
+        pass
+
+    rename_map = {
+        'date': 'Fecha',
+        'spend': 'Inversion',
+        'value': 'Ventas_Totales',
+        'purchases': 'Compras',
+        'clicks': 'Clics',
+        'clicks_out': 'Clics Salientes',
+        'impr': 'Impresiones',
+        'reach': 'Alcance',
+        'visits': 'Visitas',
+        'frequency': 'Frecuencia',
+        'cpm': 'CPM',
+        'ctr': 'CTR',
+        'ctr_out': 'CTR Saliente',
+        'roas': 'ROAS',
+        'cpa': 'CPA',
+        'lpv_rate': 'LVP_Rate_%',
+        'purchase_rate': 'Conv_Rate_%',
+        'rv3': 'RV3',
+        'rv25': 'RV25',
+        'rv75': 'RV75',
+        'rv100': 'RV100',
+        'rv25_pct': 'RV25_%',
+        'rv75_pct': 'RV75_%',
+        'rv100_pct': 'RV100_%',
+        'rtime': 'Tiempo_Promedio'
+    }
+    df_disp.rename(columns={k:v for k,v in rename_map.items() if k in df_disp.columns}, inplace=True)
+
+    ordered_cols = [c for c in ['Fecha','Inversion','Ventas_Totales','Compras','ROAS','CPA','Impresiones','Alcance','Frecuencia','CPM','Clics','CTR','Clics Salientes','CTR Saliente','Visitas','LVP_Rate_%','Conv_Rate_%','RV3','RV25','RV75','RV100','RV25_%','RV75_%','RV100_%','Tiempo_Promedio'] if c in df_disp.columns]
+    if ordered_cols:
+        df_disp = df_disp[ordered_cols]
+
+    int_cols = [c for c in ['Impresiones','Alcance','Clics','Clics Salientes','Visitas','Compras','RV3','RV25','RV75','RV100'] if c in df_disp.columns]
+    pct_cols = {c:1 for c in ['CTR','CTR Saliente','LVP_Rate_%','Conv_Rate_%','RV25_%','RV75_%','RV100_%'] if c in df_disp.columns}
+    float_cols = {c:2 for c in ['Frecuencia','ROAS','CPA','CPM'] if c in df_disp.columns}
+    if 'Tiempo_Promedio' in df_disp.columns:
+        float_cols['Tiempo_Promedio'] = 1
+
+    numeric_cols = [c for c in df_disp.columns if c != 'Fecha']
+    _format_dataframe_to_markdown(df_disp, "", log_func, float_cols_fmt=float_cols, int_cols=int_cols, pct_cols_fmt=pct_cols, currency_cols=detected_currency, numeric_cols_for_alignment=numeric_cols)
