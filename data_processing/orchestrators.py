@@ -29,7 +29,8 @@ from .report_sections import (
     _generar_tabla_vertical_global, _generar_tabla_vertical_entidad,
     _generar_tabla_embudo_rendimiento, _generar_tabla_embudo_bitacora,
     _generar_analisis_ads, _generar_tabla_top_ads_historico,
-    _generar_tabla_bitacora_entidad
+    _generar_tabla_bitacora_entidad,
+    _generar_tabla_bitacora_detallada
 )
 
 # Importaciones de módulos en la raíz del proyecto
@@ -257,12 +258,18 @@ def procesar_reporte_bitacora(input_files, output_dir, output_filename, status_q
 
             log("\n--- Análisis de Bitácora ---")
             log("\n--- Iniciando Agregación Diaria (Bitácora) ---", importante=True)
-            df_daily_agg_full = _agregar_datos_diarios(df_combined, status_queue, selected_adsets) 
+            df_daily_agg_full = _agregar_datos_diarios(df_combined, status_queue, selected_adsets)
 
             if df_daily_agg_full is None or df_daily_agg_full.empty or 'date' not in df_daily_agg_full.columns or df_daily_agg_full['date'].dropna().empty:
                 log("!!! Falló agregación diaria o no hay fechas válidas. Abortando Bitácora. !!!", importante=True)
                 status_queue.put("---ERROR---"); return
             log("Agregación diaria OK.")
+
+            try:
+                _generar_tabla_bitacora_detallada(df_daily_agg_full, detected_currency, log)
+            except Exception as e_det:
+                logger.error("Error generando tabla bitácora detallada: %s", e_det)
+                log(f"Adv: Error generando tabla Bitácora Detallada: {e_det}")
 
             min_date_overall = df_daily_agg_full['date'].min().date()
             max_date_overall = df_daily_agg_full['date'].max().date()
