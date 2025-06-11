@@ -62,8 +62,6 @@ def safe_division(n_input, d_input):
     denominator is zero, ``NaN`` is returned instead of raising an error.
     """
 
-    n = pd.to_numeric(n_input, errors="coerce")
-    d = pd.to_numeric(d_input, errors="coerce")
 
     return_scalar = np.isscalar(n_input) and np.isscalar(d_input)
 
@@ -99,8 +97,6 @@ def safe_division_pct(n_input, d_input):
     """Percentage version of :func:`safe_division`. Returns ``NaN`` when the
     denominator is zero or invalid."""
 
-    n = pd.to_numeric(n_input, errors="coerce")
-    d = pd.to_numeric(d_input, errors="coerce")
 
     return_scalar = np.isscalar(n_input) and np.isscalar(d_input)
 
