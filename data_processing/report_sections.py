@@ -1187,3 +1187,33 @@ def _generar_tabla_bitacora_detallada(df_daily_agg, detected_currency, log_func,
         currency_cols=detected_currency,
         numeric_cols_for_alignment=numeric_cols,
     )
+
+
+def _generar_tabla_bitacora_entidad(entity_level, entity_name, df_daily_entity, bitacora_periods_list, detected_currency, log_func, period_type="Weeks"):
+    """Wrapper que mantiene compatibilidad con versiones previas."""
+    if df_daily_entity is None or df_daily_entity.empty or "date" not in df_daily_entity.columns:
+        log_func("No hay datos diarios para generar la tabla de bitácora.")
+        return
+    df_local = df_daily_entity.copy()
+    if not pd.api.types.is_datetime64_any_dtype(df_local["date"]):
+        df_local["date"] = pd.to_datetime(df_local["date"], errors="coerce")
+    df_local = df_local[df_local["date"].notna()].copy()
+    min_dt = df_local["date"].min()
+    max_dt = df_local["date"].max()
+    dias_totales = df_local["date"].nunique()
+    adset_count = df_local["AdSet"].nunique() if "AdSet" in df_local.columns else None
+    _generar_tabla_vertical_entidad(
+        entity_level,
+        entity_name,
+        dias_totales,
+        df_local,
+        min_dt,
+        max_dt,
+        adset_count,
+        bitacora_periods_list,
+        detected_currency,
+        log_func,
+        period_type=period_type,
+    )
+
+
