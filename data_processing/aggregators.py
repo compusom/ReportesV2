@@ -10,8 +10,6 @@ from formatting_utils import safe_division, safe_division_pct # De formatting_ut
 # ============================================================
 def _agregar_datos_diarios(df_combined, status_queue, selected_adsets=None):
     log_and_update = lambda msg: status_queue.put(f"  [Diario] {msg}")
-    # ... (copiar el cuerpo completo de la función _agregar_datos_diarios aquí)
-    # [PEGAR AQUÍ EL CÓDIGO COMPLETO DE LA FUNCIÓN _agregar_datos_diarios DESDE EL SCRIPT ORIGINAL]
     log_and_update("Iniciando agregación diaria por Entidad...")
     if df_combined is None or df_combined.empty: log_and_update("DataFrame combinado vacío."); return pd.DataFrame()
 
