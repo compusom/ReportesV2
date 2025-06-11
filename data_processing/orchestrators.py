@@ -119,7 +119,7 @@ def procesar_reporte_bitacora(input_files, output_dir, output_filename, status_q
         output_path = os.path.join(output_dir, output_filename)
         with open(output_path, 'w', encoding='utf-8') as f_out:
             log_file_handler = f_out
-
+            log = _crear_logger_con_resumen(log_file_handler, status_queue)
 
             try:
                 locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
@@ -172,7 +172,13 @@ def procesar_reporte_bitacora(input_files, output_dir, output_filename, status_q
             # ... (fin placeholder)
 
             if not bitacora_periods_list:
-
+                bitacora_periods_list.append(
+                    (
+                        datetime.combine(min_date_overall, datetime.min.time()),
+                        datetime.combine(max_date_overall, datetime.max.time()),
+                        "Periodo Único",
+                    )
+                )
 
             # Calcular métricas y generar tablas de resumen
             df_daily_total_for_bitacora = df_daily_agg_full.groupby('date', as_index=False, observed=True).sum(numeric_only=True)
