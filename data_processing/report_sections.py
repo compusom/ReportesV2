@@ -853,635 +853,263 @@ def _generar_analisis_ads(df_combined, df_daily_agg, active_days_total_ad_df, lo
         log_func("  ---")
     else: log_func("  No hay datos para Tabla Creatividad.")
     log_func("\n--- Fin Análisis Consolidado de Ads ---")
-
- c0tc8c-codex/extend-metric_calculators-for-active-days
-def _generar_tabla_top_ads_historico(df_daily_agg, active_days_total_ad_df, log_func, detected_currency, top_n=10, sort_by_roas=False):
-    orden_desc = "ROAS Desc" if sort_by_roas else "Gasto Desc > ROAS Desc"
-    log_func("\n\n============================================================");log_func(f"===== 6. Top {top_n} Ads Histórico (Orden: {orden_desc}) =====");log_func("============================================================")
-    group_cols_ad=['Anuncio']
-    essential_cols = group_cols_ad + ['spend','impr']
+# New deduplicated functions
 
 def _generar_tabla_top_ads_historico(df_daily_agg, active_days_total_ad_df, log_func, detected_currency, top_n=10, sort_by_roas=False):
     orden_desc = "ROAS Desc" if sort_by_roas else "Gasto Desc > ROAS Desc"
-    log_func("\n\n============================================================");log_func(f"===== 6. Top {top_n} Ads Histórico (Orden: {orden_desc}) =====");log_func("============================================================")
-    group_cols_ad=['Anuncio']
-    essential_cols = group_cols_ad + ['spend','impr']
-
-def _generar_tabla_top_ads_historico(df_daily_agg, active_days_total_ad_df, log_func, detected_currency, top_n=10, sort_by_roas=False):
-    orden_desc = "ROAS Desc" if sort_by_roas else "Gasto Desc > ROAS Desc"
-    log_func("\n\n============================================================");log_func(f"===== 6. Top {top_n} Ads Histórico (Orden: {orden_desc}) =====");log_func("============================================================")
-    group_cols_ad=['Anuncio']
-    essential_cols = group_cols_ad + ['spend','impr']
-
-    group_cols_ad=['Campaign','AdSet','Anuncio'] 
-    essential_cols = group_cols_ad + ['spend','impr'] 
-
- main
-    if df_daily_agg is None or df_daily_agg.empty or not all(c_col in df_daily_agg.columns for c_col in essential_cols):
-        log_func("   Faltan columnas esenciales (Campaign, AdSet, Anuncio, spend, impr) para Top Ads."); return
-
-    df_daily_agg_copy = df_daily_agg.copy() 
+    log_func("\n\n============================================================")
+    log_func(f"===== 6. Top {top_n} Ads Histórico (Orden: {orden_desc}) =====")
+    log_func("============================================================")
+    group_cols_ad = ['Campaign', 'AdSet', 'Anuncio']
+    essential_cols = group_cols_ad + ['spend', 'impr']
+    if df_daily_agg is None or df_daily_agg.empty or not all(c in df_daily_agg.columns for c in essential_cols):
+        log_func("   Faltan columnas esenciales (Campaign, AdSet, Anuncio, spend, impr) para Top Ads.")
+        return
+    df_daily_agg_copy = df_daily_agg.copy()
     for col in group_cols_ad:
         if col in df_daily_agg_copy.columns:
             df_daily_agg_copy[col] = df_daily_agg_copy[col].astype(str)
 
- c0tc8c-codex/extend-metric_calculators-for-active-days
-    agg_dict={'spend':'sum','value':'sum','purchases':'sum','clicks':'sum','impr':'sum','reach':'sum','rtime':'mean'}
+    agg_dict = {
+        'spend': 'sum', 'value': 'sum', 'purchases': 'sum',
+        'clicks': 'sum', 'impr': 'sum', 'reach': 'sum',
+        'rtime': 'mean'
+    }
+    agg_dict_available = {k: v for k, v in agg_dict.items() if k in df_daily_agg_copy.columns}
+    if not agg_dict_available or 'spend' not in agg_dict_available or 'impr' not in agg_dict_available:
+        log_func("   No hay métricas suficientes (falta spend o impr) para agregar para Top Ads.")
+        return
 
-    agg_dict={'spend':'sum','value':'sum','purchases':'sum','clicks':'sum','impr':'sum','reach':'sum','rtime':'mean'}
+    ads_global = df_daily_agg_copy.groupby(group_cols_ad, observed=False, as_index=False).agg(agg_dict_available)
 
-    agg_dict={'spend':'sum','value':'sum','purchases':'sum','clicks':'sum','impr':'sum','reach':'sum','rtime':'mean'}
- main
-    agg_dict_available={k:v for k,v in agg_dict.items() if k in df_daily_agg_copy.columns} 
-    if not agg_dict_available or 'spend' not in agg_dict_available or 'impr' not in agg_dict_available: 
-        log_func("   No hay métricas suficientes (falta spend o impr) para agregar para Top Ads."); return
+    if all(c in ads_global for c in ['value', 'spend']):
+        ads_global['roas'] = safe_division(ads_global['value'], ads_global['spend'])
+    if all(c in ads_global for c in ['clicks', 'impr']):
+        ads_global['ctr'] = safe_division_pct(ads_global['clicks'], ads_global['impr'])
+    if all(c in ads_global for c in ['impr', 'reach']):
+        ads_global['frequency'] = safe_division(ads_global['impr'], ads_global['reach'])
+    if all(c in ads_global for c in ['spend', 'impr']):
+        ads_global['cpm'] = safe_division(ads_global['spend'], ads_global['impr']) * 1000
+    if all(c in ads_global for c in ['spend', 'purchases']):
+        ads_global['cpa'] = safe_division(ads_global['spend'], ads_global['purchases'])
+    if all(c in ads_global for c in ['purchases', 'clicks']):
+        ads_global['cvr'] = safe_division_pct(ads_global['purchases'], ads_global['clicks'])
+    if all(c in ads_global for c in ['value', 'purchases']):
+        ads_global['aov'] = safe_division(ads_global['value'], ads_global['purchases'])
 
-    ads_global=df_daily_agg_copy.groupby(group_cols_ad,observed=False,as_index=False).agg(agg_dict_available) 
-
- c0tc8c-codex/extend-metric_calculators-for-active-days
-    if all(c_col in ads_global for c_col in ['value','spend']): ads_global['roas']=safe_division(ads_global['value'],ads_global['spend'])
-    if all(c_col in ads_global for c_col in ['clicks','impr']): ads_global['ctr']=safe_division_pct(ads_global['clicks'],ads_global['impr'])
-    if all(c_col in ads_global for c_col in ['impr','reach']): ads_global['frequency']=safe_division(ads_global['impr'],ads_global['reach'])
-    if all(c_col in ads_global for c_col in ['spend','impr']): ads_global['cpm']=safe_division(ads_global['spend'],ads_global['impr'])*1000
-    if all(c_col in ads_global for c_col in ['spend','purchases']): ads_global['cpa']=safe_division(ads_global['spend'],ads_global['purchases'])
-    if all(c_col in ads_global for c_col in ['purchases','clicks']): ads_global['cvr']=safe_division_pct(ads_global['purchases'],ads_global['clicks'])
-    if all(c_col in ads_global for c_col in ['value','purchases']): ads_global['aov']=safe_division(ads_global['value'],ads_global['purchases'])
-
-    if active_days_total_ad_df is not None and not active_days_total_ad_df.empty and 'Días_Activo_Total' in active_days_total_ad_df.columns and 'Anuncio' in active_days_total_ad_df.columns:
+    if (
+        active_days_total_ad_df is not None
+        and not active_days_total_ad_df.empty
+        and 'Días_Activo_Total' in active_days_total_ad_df.columns
+        and 'Anuncio' in active_days_total_ad_df.columns
+    ):
         ad_days = active_days_total_ad_df.copy()
         ad_days['Anuncio'] = ad_days['Anuncio'].astype(str)
         ad_days = ad_days.groupby('Anuncio', as_index=False)['Días_Activo_Total'].sum()
         ads_global['Anuncio'] = ads_global['Anuncio'].astype(str)
         ads_global = pd.merge(ads_global, ad_days, on='Anuncio', how='left')
         ads_global['Días_Activo_Total'] = ads_global['Días_Activo_Total'].fillna(0).astype(int)
-    if 'Días_Activo_Total' not in ads_global: ads_global['Días_Activo_Total'] = 0
+    if 'Días_Activo_Total' not in ads_global:
+        ads_global['Días_Activo_Total'] = 0
 
-    if all(c_col in ads_global for c_col in ['value','spend']): ads_global['roas']=safe_division(ads_global['value'],ads_global['spend'])
-    if all(c_col in ads_global for c_col in ['clicks','impr']): ads_global['ctr']=safe_division_pct(ads_global['clicks'],ads_global['impr'])
-    if all(c_col in ads_global for c_col in ['impr','reach']): ads_global['frequency']=safe_division(ads_global['impr'],ads_global['reach'])
-    if all(c_col in ads_global for c_col in ['spend','impr']): ads_global['cpm']=safe_division(ads_global['spend'],ads_global['impr'])*1000
-    if all(c_col in ads_global for c_col in ['spend','purchases']): ads_global['cpa']=safe_division(ads_global['spend'],ads_global['purchases'])
-    if all(c_col in ads_global for c_col in ['purchases','clicks']): ads_global['cvr']=safe_division_pct(ads_global['purchases'],ads_global['clicks'])
-    if all(c_col in ads_global for c_col in ['value','purchases']): ads_global['aov']=safe_division(ads_global['value'],ads_global['purchases'])
+    ads_global = ads_global[(ads_global['impr'].fillna(0) > 0) & (ads_global['spend'].fillna(0) > 0)].copy()
+    if ads_global.empty:
+        log_func("   No hay Ads con impresiones y gasto positivos.")
+        return
 
-    if active_days_total_ad_df is not None and not active_days_total_ad_df.empty and 'Días_Activo_Total' in active_days_total_ad_df.columns and 'Anuncio' in active_days_total_ad_df.columns:
-        ad_days = active_days_total_ad_df.copy()
-        ad_days['Anuncio'] = ad_days['Anuncio'].astype(str)
-        ad_days = ad_days.groupby('Anuncio', as_index=False)['Días_Activo_Total'].sum()
-        ads_global['Anuncio'] = ads_global['Anuncio'].astype(str)
-        ads_global = pd.merge(ads_global, ad_days, on='Anuncio', how='left')
-        ads_global['Días_Activo_Total'] = ads_global['Días_Activo_Total'].fillna(0).astype(int)
-    if 'Días_Activo_Total' not in ads_global: ads_global['Días_Activo_Total'] = 0
-
-    if all(c_col in ads_global for c_col in ['value','spend']): ads_global['roas']=safe_division(ads_global['value'],ads_global['spend'])
-    if all(c_col in ads_global for c_col in ['clicks','impr']): ads_global['ctr']=safe_division_pct(ads_global['clicks'],ads_global['impr'])
-    if all(c_col in ads_global for c_col in ['impr','reach']): ads_global['frequency']=safe_division(ads_global['impr'],ads_global['reach'])
-    if all(c_col in ads_global for c_col in ['spend','impr']): ads_global['cpm']=safe_division(ads_global['spend'],ads_global['impr'])*1000
-    if all(c_col in ads_global for c_col in ['spend','purchases']): ads_global['cpa']=safe_division(ads_global['spend'],ads_global['purchases'])
-    if all(c_col in ads_global for c_col in ['purchases','clicks']): ads_global['cvr']=safe_division_pct(ads_global['purchases'],ads_global['clicks'])
-    if all(c_col in ads_global for c_col in ['value','purchases']): ads_global['aov']=safe_division(ads_global['value'],ads_global['purchases'])
-
-    if active_days_total_ad_df is not None and not active_days_total_ad_df.empty and 'Días_Activo_Total' in active_days_total_ad_df.columns and 'Anuncio' in active_days_total_ad_df.columns:
-        ad_days = active_days_total_ad_df.copy()
-        ad_days['Anuncio'] = ad_days['Anuncio'].astype(str)
-        ad_days = ad_days.groupby('Anuncio', as_index=False)['Días_Activo_Total'].sum()
-        ads_global['Anuncio'] = ads_global['Anuncio'].astype(str)
-        ads_global = pd.merge(ads_global, ad_days, on='Anuncio', how='left')
-        ads_global['Días_Activo_Total'] = ads_global['Días_Activo_Total'].fillna(0).astype(int)
-    if 'Días_Activo_Total' not in ads_global: ads_global['Días_Activo_Total'] = 0
- main
-
-    ads_global=ads_global[(ads_global['impr'].fillna(0)>0)&(ads_global['spend'].fillna(0)>0)].copy() 
-    if ads_global.empty: log_func("   No hay Ads con impresiones y gasto positivos."); return
-
- c0tc8c-codex/extend-metric_calculators-for-active-days
-    sort_cols_top=[]; ascend_top=[]
+    sort_cols_top = []
+    ascend_top = []
     if sort_by_roas:
-        if 'roas' in ads_global: sort_cols_top.append('roas'); ascend_top.append(False)
-        if 'spend' in ads_global: sort_cols_top.append('spend'); ascend_top.append(False)
+        if 'roas' in ads_global:
+            sort_cols_top.append('roas')
+            ascend_top.append(False)
+        if 'spend' in ads_global:
+            sort_cols_top.append('spend')
+            ascend_top.append(False)
     else:
-        if 'spend' in ads_global: sort_cols_top.append('spend'); ascend_top.append(False)
-        if 'roas' in ads_global: sort_cols_top.append('roas'); ascend_top.append(False)
+        if 'spend' in ads_global:
+            sort_cols_top.append('spend')
+            ascend_top.append(False)
+        if 'roas' in ads_global:
+            sort_cols_top.append('roas')
+            ascend_top.append(False)
 
-    sort_cols_top=[]; ascend_top=[]
-    if sort_by_roas:
-        if 'roas' in ads_global: sort_cols_top.append('roas'); ascend_top.append(False)
-        if 'spend' in ads_global: sort_cols_top.append('spend'); ascend_top.append(False)
+    df_top = ads_global.copy()
+    if sort_cols_top:
+        for scol, asc_val in zip(sort_cols_top, ascend_top):
+            if pd.api.types.is_numeric_dtype(df_top[scol]):
+                fill_value = -np.inf if not asc_val else np.inf
+                df_top[scol] = df_top[scol].fillna(fill_value)
+        df_top = df_top.sort_values(by=sort_cols_top, ascending=ascend_top).head(top_n)
     else:
-        if 'spend' in ads_global: sort_cols_top.append('spend'); ascend_top.append(False)
-        if 'roas' in ads_global: sort_cols_top.append('roas'); ascend_top.append(False)
-
-    sort_cols_top=[]; ascend_top=[]
-    if sort_by_roas:
-        if 'roas' in ads_global: sort_cols_top.append('roas'); ascend_top.append(False)
-        if 'spend' in ads_global: sort_cols_top.append('spend'); ascend_top.append(False)
-    else:
-        if 'spend' in ads_global: sort_cols_top.append('spend'); ascend_top.append(False)
-        if 'roas' in ads_global: sort_cols_top.append('roas'); ascend_top.append(False)
- main
-
-    df_top=ads_global.copy()
-    if sort_cols_top: 
-         for scol,asc_val in zip(sort_cols_top,ascend_top):
-              if pd.api.types.is_numeric_dtype(df_top[scol]):
-                  fill_value = -np.inf if not asc_val else np.inf
-                  df_top[scol]=df_top[scol].fillna(fill_value)
-         df_top=df_top.sort_values(by=sort_cols_top,ascending=ascend_top).head(top_n) 
-    else: 
         log_func("   No se pudo ordenar Top Ads (faltan columnas spend/roas). Mostrando los primeros {top_n}.")
-        df_top=df_top.head(top_n)
+        df_top = df_top.head(top_n)
 
- c0tc8c-codex/extend-metric_calculators-for-active-days
-    table_headers=['Anuncio','Días Act','Gasto','ROAS','Compras','CTR (%)','Frecuencia','Tiempo RV (s)','CPM','CPA','CVR','AOV']
-    table_data=[]
-    for _,row_val in df_top.iterrows():
+    table_headers = ['Anuncio','Días Act','Gasto','ROAS','Compras','CTR (%)','Frecuencia','Tiempo RV (s)','CPM','CPA','CVR','AOV']
+    table_data = []
+    for _, row_val in df_top.iterrows():
         table_data.append({
-            'Anuncio': row_val.get('Anuncio','-'),
-            'Días Act': fmt_int(row_val.get('Días_Activo_Total',0)),
-            'Gasto': f"{detected_currency}{fmt_float(row_val.get('spend'),0)}",
-            'ROAS': f"{fmt_float(row_val.get('roas'),2)}x",
+            'Anuncio': row_val.get('Anuncio', '-'),
+            'Días Act': fmt_int(row_val.get('Días_Activo_Total', 0)),
+            'Gasto': f"{detected_currency}{fmt_float(row_val.get('spend'), 0)}",
+            'ROAS': f"{fmt_float(row_val.get('roas'), 2)}x",
             'Compras': fmt_int(row_val.get('purchases')),
-            'CTR (%)': fmt_pct(row_val.get('ctr'),2),
-            'Frecuencia': fmt_float(row_val.get('frequency'),2),
-            'Tiempo RV (s)': f"{fmt_float(row_val.get('rtime'),1)}s",
-            'CPM': f"{detected_currency}{fmt_float(row_val.get('cpm'),2)}",
-            'CPA': f"{detected_currency}{fmt_float(row_val.get('cpa'),2)}",
-            'CVR': fmt_pct(row_val.get('cvr'),2),
-            'AOV': f"{detected_currency}{fmt_float(row_val.get('aov'),2)}",
+            'CTR (%)': fmt_pct(row_val.get('ctr'), 2),
+            'Frecuencia': fmt_float(row_val.get('frequency'), 2),
+            'Tiempo RV (s)': f"{fmt_float(row_val.get('rtime'), 1)}s",
+            'CPM': f"{detected_currency}{fmt_float(row_val.get('cpm'), 2)}",
+            'CPA': f"{detected_currency}{fmt_float(row_val.get('cpa'), 2)}",
+            'CVR': fmt_pct(row_val.get('cvr'), 2),
+            'AOV': f"{detected_currency}{fmt_float(row_val.get('aov'), 2)}",
         })
-    if table_data: 
-        df_display=pd.DataFrame(table_data)
-        df_display = df_display[[h for h in table_headers if h in df_display.columns]] 
-        num_cols=[h for h in df_display.columns if h not in ['Anuncio']]
-        _format_dataframe_to_markdown(df_display,f"** Top {top_n} Ads por Gasto > ROAS (Global Acumulado) **",log_func,currency_cols=detected_currency, stability_cols=[], numeric_cols_for_alignment=num_cols)
-    else: log_func(f"   No hay datos para mostrar en Top {top_n} Ads.");
-    log_func("\n  **Detalle Top Ads Histórico:** Agrupa anuncios con el mismo nombre sumando sus métricas. Todas las métricas son acumuladas globales y el orden es por ROAS descendente.");
+    if table_data:
+        df_display = pd.DataFrame(table_data)
+        df_display = df_display[[h for h in table_headers if h in df_display.columns]]
+        num_cols = [h for h in df_display.columns if h not in ['Anuncio']]
+        _format_dataframe_to_markdown(
+            df_display,
+            f"** Top {top_n} Ads por Gasto > ROAS (Global Acumulado) **",
+            log_func,
+            currency_cols=detected_currency,
+            stability_cols=[],
+            numeric_cols_for_alignment=num_cols,
+        )
+    else:
+        log_func(f"   No hay datos para mostrar en Top {top_n} Ads.")
+    log_func("\n  **Detalle Top Ads Histórico:** Agrupa anuncios con el mismo nombre sumando sus métricas. Todas las métricas son acumuladas globales y el orden es por ROAS descendente.")
     log_func("  ---")
 
 def _generar_tabla_top_adsets_historico(df_daily_agg, active_days_adset_df, log_func, detected_currency, top_n=15):
-    log_func("\n\n============================================================");log_func(f"===== Top {top_n} AdSets Histórico (Orden: ROAS Desc) =====");log_func("============================================================")
-    group_cols=['Campaign','AdSet']
-    essential_cols=group_cols+['spend','impr']
+    log_func("\n\n============================================================")
+    log_func(f"===== Top {top_n} AdSets Histórico (Orden: ROAS Desc) =====")
+    log_func("============================================================")
+    group_cols = ['Campaign', 'AdSet']
+    essential_cols = group_cols + ['spend', 'impr']
     if df_daily_agg is None or df_daily_agg.empty or not all(c in df_daily_agg.columns for c in essential_cols):
-        log_func("   Faltan columnas esenciales para Top AdSets."); return
-    df=df_daily_agg.copy();
-    for col in group_cols:
-        if col in df.columns: df[col]=df[col].astype(str)
-    agg_dict={'spend':'sum','value':'sum','purchases':'sum','impr':'sum','reach':'sum','clicks':'sum'}
-    agg_dict_avail={k:v for k,v in agg_dict.items() if k in df.columns}
-    if not agg_dict_avail: log_func("   No hay métricas suficientes para Top AdSets."); return
-    agg=df.groupby(group_cols,as_index=False,observed=False).agg(agg_dict_avail)
-    if all(c in agg.columns for c in ['value','spend']): agg['roas']=safe_division(agg['value'],agg['spend'])
-    if all(c in agg.columns for c in ['clicks','impr']): agg['ctr']=safe_division_pct(agg['clicks'],agg['impr'])
-    if all(c in agg.columns for c in ['impr','reach']): agg['frequency']=safe_division(agg['impr'],agg['reach'])
-    if active_days_adset_df is not None and not active_days_adset_df.empty and 'Días_Activo_Total' in active_days_adset_df.columns:
-        merge_cols=[c for c in group_cols if c in active_days_adset_df.columns]
-        if merge_cols:
-            for col in merge_cols:
-                agg[col]=agg[col].astype(str)
-                active_days_adset_df[col]=active_days_adset_df[col].astype(str)
-            agg=pd.merge(agg,active_days_adset_df[merge_cols+['Días_Activo_Total']],on=merge_cols,how='left')
-            agg['Días_Activo_Total']=agg['Días_Activo_Total'].fillna(0).astype(int)
-    if 'Días_Activo_Total' not in agg.columns: agg['Días_Activo_Total']=0
-    agg=agg[(agg['impr'].fillna(0)>0)&(agg['spend'].fillna(0)>0)].copy()
-    if agg.empty: log_func("   No hay AdSets con datos positivos."); return
-    sort_cols=['roas','spend'] if 'spend' in agg.columns else ['roas']
-    agg=agg.sort_values(by=sort_cols,ascending=[False]*len(sort_cols)).head(top_n)
-    headers=['Campaña','AdSet','Días Act','Gasto','ROAS','Compras','CTR (%)','Frecuencia']
-    rows=[]
-    for _,r in agg.iterrows():
-        rows.append({'Campaña':r.get('Campaign','-'),'AdSet':r.get('AdSet','-'),'Días Act':fmt_int(r.get('Días_Activo_Total',0)),'Gasto':f"{detected_currency}{fmt_float(r.get('spend'),0)}",'ROAS':f"{fmt_float(r.get('roas'),2)}x",'Compras':fmt_int(r.get('purchases')),'CTR (%)':fmt_pct(r.get('ctr'),2),'Frecuencia':fmt_float(r.get('frequency'),2)})
-    if rows:
-        df_disp=pd.DataFrame(rows)
-        df_disp=df_disp[[h for h in headers if h in df_disp.columns]]
-        num_cols=[h for h in df_disp.columns if h not in ['Campaña','AdSet']]
-        _format_dataframe_to_markdown(df_disp,f"** Top {top_n} AdSets por ROAS **",log_func,currency_cols=detected_currency,numeric_cols_for_alignment=num_cols)
-    else:
-        log_func("   No hay datos para Top AdSets.")
-
-def _generar_tabla_top_campaigns_historico(df_daily_agg, active_days_campaign_df, log_func, detected_currency, top_n=15):
-    log_func("\n\n============================================================");log_func(f"===== Top {top_n} Campañas Histórico (Orden: ROAS Desc) =====");log_func("============================================================")
-    group_cols=['Campaign']
-    essential_cols=group_cols+['spend','impr']
-    if df_daily_agg is None or df_daily_agg.empty or not all(c in df_daily_agg.columns for c in essential_cols):
-        log_func("   Faltan columnas esenciales para Top Campañas."); return
-    df=df_daily_agg.copy();
-    for col in group_cols:
-        if col in df.columns: df[col]=df[col].astype(str)
-    agg_dict={'spend':'sum','value':'sum','purchases':'sum','impr':'sum','reach':'sum','clicks':'sum'}
-    agg_dict_avail={k:v for k,v in agg_dict.items() if k in df.columns}
-    if not agg_dict_avail: log_func("   No hay métricas suficientes para Top Campañas."); return
-    agg=df.groupby(group_cols,as_index=False,observed=False).agg(agg_dict_avail)
-    if all(c in agg.columns for c in ['value','spend']): agg['roas']=safe_division(agg['value'],agg['spend'])
-    if all(c in agg.columns for c in ['clicks','impr']): agg['ctr']=safe_division_pct(agg['clicks'],agg['impr'])
-    if all(c in agg.columns for c in ['impr','reach']): agg['frequency']=safe_division(agg['impr'],agg['reach'])
-    if active_days_campaign_df is not None and not active_days_campaign_df.empty and 'Días_Activo_Total' in active_days_campaign_df.columns:
-        merge_cols=[c for c in group_cols if c in active_days_campaign_df.columns]
-        if merge_cols:
-            for col in merge_cols:
-                agg[col]=agg[col].astype(str)
-                active_days_campaign_df[col]=active_days_campaign_df[col].astype(str)
-            agg=pd.merge(agg,active_days_campaign_df[merge_cols+['Días_Activo_Total']],on=merge_cols,how='left')
-            agg['Días_Activo_Total']=agg['Días_Activo_Total'].fillna(0).astype(int)
-    if 'Días_Activo_Total' not in agg.columns: agg['Días_Activo_Total']=0
-    agg=agg[(agg['impr'].fillna(0)>0)&(agg['spend'].fillna(0)>0)].copy()
-    if agg.empty: log_func("   No hay Campañas con datos positivos."); return
-    sort_cols=['roas','spend'] if 'spend' in agg.columns else ['roas']
-    agg=agg.sort_values(by=sort_cols,ascending=[False]*len(sort_cols)).head(top_n)
-    headers=['Campaña','Días Act','Gasto','ROAS','Compras','CTR (%)','Frecuencia']
-    rows=[]
-    for _,r in agg.iterrows():
-        rows.append({'Campaña':r.get('Campaign','-'),'Días Act':fmt_int(r.get('Días_Activo_Total',0)),'Gasto':f"{detected_currency}{fmt_float(r.get('spend'),0)}",'ROAS':f"{fmt_float(r.get('roas'),2)}x",'Compras':fmt_int(r.get('purchases')),'CTR (%)':fmt_pct(r.get('ctr'),2),'Frecuencia':fmt_float(r.get('frequency'),2)})
-    if rows:
-        df_disp=pd.DataFrame(rows)
-        df_disp=df_disp[[h for h in headers if h in df_disp.columns]]
-        num_cols=[h for h in df_disp.columns if h not in ['Campaña']]
-        _format_dataframe_to_markdown(df_disp,f"** Top {top_n} Campañas por ROAS **",log_func,currency_cols=detected_currency,numeric_cols_for_alignment=num_cols)
-    else:
-        log_func("   No hay datos para Top Campañas.")
-
-    table_headers=['Anuncio','Días Act','Gasto','ROAS','Compras','CTR (%)','Frecuencia','Tiempo RV (s)','CPM','CPA','CVR','AOV']
-    table_data=[]
-    for _,row_val in df_top.iterrows():
-        table_data.append({
-            'Anuncio': row_val.get('Anuncio','-'),
-            'Días Act': fmt_int(row_val.get('Días_Activo_Total',0)),
-            'Gasto': f"{detected_currency}{fmt_float(row_val.get('spend'),0)}",
-            'ROAS': f"{fmt_float(row_val.get('roas'),2)}x",
-            'Compras': fmt_int(row_val.get('purchases')),
-            'CTR (%)': fmt_pct(row_val.get('ctr'),2),
-            'Frecuencia': fmt_float(row_val.get('frequency'),2),
-            'Tiempo RV (s)': f"{fmt_float(row_val.get('rtime'),1)}s",
-            'CPM': f"{detected_currency}{fmt_float(row_val.get('cpm'),2)}",
-            'CPA': f"{detected_currency}{fmt_float(row_val.get('cpa'),2)}",
-            'CVR': fmt_pct(row_val.get('cvr'),2),
-            'AOV': f"{detected_currency}{fmt_float(row_val.get('aov'),2)}",
-        })
-    if table_data: 
-        df_display=pd.DataFrame(table_data)
-        df_display = df_display[[h for h in table_headers if h in df_display.columns]] 
-        num_cols=[h for h in df_display.columns if h not in ['Anuncio']]
-        _format_dataframe_to_markdown(df_display,f"** Top {top_n} Ads por Gasto > ROAS (Global Acumulado) **",log_func,currency_cols=detected_currency, stability_cols=[], numeric_cols_for_alignment=num_cols)
-    else: log_func(f"   No hay datos para mostrar en Top {top_n} Ads.");
-    log_func("\n  **Detalle Top Ads Histórico:** Agrupa anuncios con el mismo nombre sumando sus métricas. Todas las métricas son acumuladas globales y el orden es por ROAS descendente.");
-    log_func("  ---")
-
-def _generar_tabla_top_adsets_historico(df_daily_agg, active_days_adset_df, log_func, detected_currency, top_n=15):
-    log_func("\n\n============================================================");log_func(f"===== Top {top_n} AdSets Histórico (Orden: ROAS Desc) =====");log_func("============================================================")
-    group_cols=['Campaign','AdSet']
-    essential_cols=group_cols+['spend','impr']
-    if df_daily_agg is None or df_daily_agg.empty or not all(c in df_daily_agg.columns for c in essential_cols):
-        log_func("   Faltan columnas esenciales para Top AdSets."); return
-    df=df_daily_agg.copy();
-    for col in group_cols:
-        if col in df.columns: df[col]=df[col].astype(str)
-    agg_dict={'spend':'sum','value':'sum','purchases':'sum','impr':'sum','reach':'sum','clicks':'sum'}
-    agg_dict_avail={k:v for k,v in agg_dict.items() if k in df.columns}
-    if not agg_dict_avail: log_func("   No hay métricas suficientes para Top AdSets."); return
-    agg=df.groupby(group_cols,as_index=False,observed=False).agg(agg_dict_avail)
-    if all(c in agg.columns for c in ['value','spend']): agg['roas']=safe_division(agg['value'],agg['spend'])
-    if all(c in agg.columns for c in ['clicks','impr']): agg['ctr']=safe_division_pct(agg['clicks'],agg['impr'])
-    if all(c in agg.columns for c in ['impr','reach']): agg['frequency']=safe_division(agg['impr'],agg['reach'])
-    if active_days_adset_df is not None and not active_days_adset_df.empty and 'Días_Activo_Total' in active_days_adset_df.columns:
-        merge_cols=[c for c in group_cols if c in active_days_adset_df.columns]
-        if merge_cols:
-            for col in merge_cols:
-                agg[col]=agg[col].astype(str)
-                active_days_adset_df[col]=active_days_adset_df[col].astype(str)
-            agg=pd.merge(agg,active_days_adset_df[merge_cols+['Días_Activo_Total']],on=merge_cols,how='left')
-            agg['Días_Activo_Total']=agg['Días_Activo_Total'].fillna(0).astype(int)
-    if 'Días_Activo_Total' not in agg.columns: agg['Días_Activo_Total']=0
-    agg=agg[(agg['impr'].fillna(0)>0)&(agg['spend'].fillna(0)>0)].copy()
-    if agg.empty: log_func("   No hay AdSets con datos positivos."); return
-    sort_cols=['roas','spend'] if 'spend' in agg.columns else ['roas']
-    agg=agg.sort_values(by=sort_cols,ascending=[False]*len(sort_cols)).head(top_n)
-    headers=['Campaña','AdSet','Días Act','Gasto','ROAS','Compras','CTR (%)','Frecuencia']
-    rows=[]
-    for _,r in agg.iterrows():
-        rows.append({'Campaña':r.get('Campaign','-'),'AdSet':r.get('AdSet','-'),'Días Act':fmt_int(r.get('Días_Activo_Total',0)),'Gasto':f"{detected_currency}{fmt_float(r.get('spend'),0)}",'ROAS':f"{fmt_float(r.get('roas'),2)}x",'Compras':fmt_int(r.get('purchases')),'CTR (%)':fmt_pct(r.get('ctr'),2),'Frecuencia':fmt_float(r.get('frequency'),2)})
-    if rows:
-        df_disp=pd.DataFrame(rows)
-        df_disp=df_disp[[h for h in headers if h in df_disp.columns]]
-        num_cols=[h for h in df_disp.columns if h not in ['Campaña','AdSet']]
-        _format_dataframe_to_markdown(df_disp,f"** Top {top_n} AdSets por ROAS **",log_func,currency_cols=detected_currency,numeric_cols_for_alignment=num_cols)
-    else:
-        log_func("   No hay datos para Top AdSets.")
-
-def _generar_tabla_top_campaigns_historico(df_daily_agg, active_days_campaign_df, log_func, detected_currency, top_n=15):
-    log_func("\n\n============================================================");log_func(f"===== Top {top_n} Campañas Histórico (Orden: ROAS Desc) =====");log_func("============================================================")
-    group_cols=['Campaign']
-    essential_cols=group_cols+['spend','impr']
-    if df_daily_agg is None or df_daily_agg.empty or not all(c in df_daily_agg.columns for c in essential_cols):
-        log_func("   Faltan columnas esenciales para Top Campañas."); return
-    df=df_daily_agg.copy();
-    for col in group_cols:
-        if col in df.columns: df[col]=df[col].astype(str)
-    agg_dict={'spend':'sum','value':'sum','purchases':'sum','impr':'sum','reach':'sum','clicks':'sum'}
-    agg_dict_avail={k:v for k,v in agg_dict.items() if k in df.columns}
-    if not agg_dict_avail: log_func("   No hay métricas suficientes para Top Campañas."); return
-    agg=df.groupby(group_cols,as_index=False,observed=False).agg(agg_dict_avail)
-    if all(c in agg.columns for c in ['value','spend']): agg['roas']=safe_division(agg['value'],agg['spend'])
-    if all(c in agg.columns for c in ['clicks','impr']): agg['ctr']=safe_division_pct(agg['clicks'],agg['impr'])
-    if all(c in agg.columns for c in ['impr','reach']): agg['frequency']=safe_division(agg['impr'],agg['reach'])
-    if active_days_campaign_df is not None and not active_days_campaign_df.empty and 'Días_Activo_Total' in active_days_campaign_df.columns:
-        merge_cols=[c for c in group_cols if c in active_days_campaign_df.columns]
-        if merge_cols:
-            for col in merge_cols:
-                agg[col]=agg[col].astype(str)
-                active_days_campaign_df[col]=active_days_campaign_df[col].astype(str)
-            agg=pd.merge(agg,active_days_campaign_df[merge_cols+['Días_Activo_Total']],on=merge_cols,how='left')
-            agg['Días_Activo_Total']=agg['Días_Activo_Total'].fillna(0).astype(int)
-    if 'Días_Activo_Total' not in agg.columns: agg['Días_Activo_Total']=0
-    agg=agg[(agg['impr'].fillna(0)>0)&(agg['spend'].fillna(0)>0)].copy()
-    if agg.empty: log_func("   No hay Campañas con datos positivos."); return
-    sort_cols=['roas','spend'] if 'spend' in agg.columns else ['roas']
-    agg=agg.sort_values(by=sort_cols,ascending=[False]*len(sort_cols)).head(top_n)
-    headers=['Campaña','Días Act','Gasto','ROAS','Compras','CTR (%)','Frecuencia']
-    rows=[]
-    for _,r in agg.iterrows():
-        rows.append({'Campaña':r.get('Campaign','-'),'Días Act':fmt_int(r.get('Días_Activo_Total',0)),'Gasto':f"{detected_currency}{fmt_float(r.get('spend'),0)}",'ROAS':f"{fmt_float(r.get('roas'),2)}x",'Compras':fmt_int(r.get('purchases')),'CTR (%)':fmt_pct(r.get('ctr'),2),'Frecuencia':fmt_float(r.get('frequency'),2)})
-    if rows:
-        df_disp=pd.DataFrame(rows)
-        df_disp=df_disp[[h for h in headers if h in df_disp.columns]]
-        num_cols=[h for h in df_disp.columns if h not in ['Campaña']]
-        _format_dataframe_to_markdown(df_disp,f"** Top {top_n} Campañas por ROAS **",log_func,currency_cols=detected_currency,numeric_cols_for_alignment=num_cols)
-    else:
-        log_func("   No hay datos para Top Campañas.")
-
-    table_headers=['Anuncio','Días Act','Gasto','ROAS','Compras','CTR (%)','Frecuencia','Tiempo RV (s)','CPM','CPA','CVR','AOV']
-    table_data=[]
-    for _,row_val in df_top.iterrows():
-        table_data.append({
-            'Anuncio': row_val.get('Anuncio','-'),
-            'Días Act': fmt_int(row_val.get('Días_Activo_Total',0)),
-            'Gasto': f"{detected_currency}{fmt_float(row_val.get('spend'),0)}",
-            'ROAS': f"{fmt_float(row_val.get('roas'),2)}x",
-            'Compras': fmt_int(row_val.get('purchases')),
-            'CTR (%)': fmt_pct(row_val.get('ctr'),2),
-            'Frecuencia': fmt_float(row_val.get('frequency'),2),
-            'Tiempo RV (s)': f"{fmt_float(row_val.get('rtime'),1)}s",
-            'CPM': f"{detected_currency}{fmt_float(row_val.get('cpm'),2)}",
-            'CPA': f"{detected_currency}{fmt_float(row_val.get('cpa'),2)}",
-            'CVR': fmt_pct(row_val.get('cvr'),2),
-            'AOV': f"{detected_currency}{fmt_float(row_val.get('aov'),2)}",
-        })
-    if table_data: 
-        df_display=pd.DataFrame(table_data)
-        df_display = df_display[[h for h in table_headers if h in df_display.columns]] 
-        num_cols=[h for h in df_display.columns if h not in ['Anuncio']]
-        _format_dataframe_to_markdown(df_display,f"** Top {top_n} Ads por Gasto > ROAS (Global Acumulado) **",log_func,currency_cols=detected_currency, stability_cols=[], numeric_cols_for_alignment=num_cols)
-    else: log_func(f"   No hay datos para mostrar en Top {top_n} Ads.");
-    log_func("\n  **Detalle Top Ads Histórico:** Agrupa anuncios con el mismo nombre sumando sus métricas. Todas las métricas son acumuladas globales y el orden es por ROAS descendente.");
-
-    else: log_func(f"   No hay datos para mostrar en Top {top_n} Ads.");
-    log_func("\n  **Detalle Top Ads Histórico:** Muestra los anuncios con mejor rendimiento histórico, ordenados primero por mayor gasto total y luego por ROAS más alto. Todas las métricas son acumuladas globales.");
-
-    log_func("  ---")
-main
-
-def _generar_tabla_top_adsets_historico(df_daily_agg, active_days_adset_df, log_func, detected_currency, top_n=15):
-    log_func("\n\n============================================================");log_func(f"===== Top {top_n} AdSets Histórico (Orden: ROAS Desc) =====");log_func("============================================================")
-    group_cols=['Campaign','AdSet']
-    essential_cols=group_cols+['spend','impr']
-    if df_daily_agg is None or df_daily_agg.empty or not all(c in df_daily_agg.columns for c in essential_cols):
-        log_func("   Faltan columnas esenciales para Top AdSets."); return
-    df=df_daily_agg.copy();
-    for col in group_cols:
-        if col in df.columns: df[col]=df[col].astype(str)
-    agg_dict={'spend':'sum','value':'sum','purchases':'sum','impr':'sum','reach':'sum','clicks':'sum'}
-    agg_dict_avail={k:v for k,v in agg_dict.items() if k in df.columns}
-    if not agg_dict_avail: log_func("   No hay métricas suficientes para Top AdSets."); return
-    agg=df.groupby(group_cols,as_index=False,observed=False).agg(agg_dict_avail)
-    if all(c in agg.columns for c in ['value','spend']): agg['roas']=safe_division(agg['value'],agg['spend'])
-    if all(c in agg.columns for c in ['clicks','impr']): agg['ctr']=safe_division_pct(agg['clicks'],agg['impr'])
-    if all(c in agg.columns for c in ['impr','reach']): agg['frequency']=safe_division(agg['impr'],agg['reach'])
-    if active_days_adset_df is not None and not active_days_adset_df.empty and 'Días_Activo_Total' in active_days_adset_df.columns:
-        merge_cols=[c for c in group_cols if c in active_days_adset_df.columns]
-        if merge_cols:
-            for col in merge_cols:
-                agg[col]=agg[col].astype(str)
-                active_days_adset_df[col]=active_days_adset_df[col].astype(str)
-            agg=pd.merge(agg,active_days_adset_df[merge_cols+['Días_Activo_Total']],on=merge_cols,how='left')
-            agg['Días_Activo_Total']=agg['Días_Activo_Total'].fillna(0).astype(int)
-    if 'Días_Activo_Total' not in agg.columns: agg['Días_Activo_Total']=0
-    agg=agg[(agg['impr'].fillna(0)>0)&(agg['spend'].fillna(0)>0)].copy()
-    if agg.empty: log_func("   No hay AdSets con datos positivos."); return
-    sort_cols=['roas','spend'] if 'spend' in agg.columns else ['roas']
-    agg=agg.sort_values(by=sort_cols,ascending=[False]*len(sort_cols)).head(top_n)
-    headers=['Campaña','AdSet','Días Act','Gasto','ROAS','Compras','CTR (%)','Frecuencia']
-    rows=[]
-    for _,r in agg.iterrows():
-        rows.append({'Campaña':r.get('Campaign','-'),'AdSet':r.get('AdSet','-'),'Días Act':fmt_int(r.get('Días_Activo_Total',0)),'Gasto':f"{detected_currency}{fmt_float(r.get('spend'),0)}",'ROAS':f"{fmt_float(r.get('roas'),2)}x",'Compras':fmt_int(r.get('purchases')),'CTR (%)':fmt_pct(r.get('ctr'),2),'Frecuencia':fmt_float(r.get('frequency'),2)})
-    if rows:
-        df_disp=pd.DataFrame(rows)
-        df_disp=df_disp[[h for h in headers if h in df_disp.columns]]
-        num_cols=[h for h in df_disp.columns if h not in ['Campaña','AdSet']]
-        _format_dataframe_to_markdown(df_disp,f"** Top {top_n} AdSets por ROAS **",log_func,currency_cols=detected_currency,numeric_cols_for_alignment=num_cols)
-    else:
-        log_func("   No hay datos para Top AdSets.")
-
-def _generar_tabla_top_campaigns_historico(df_daily_agg, active_days_campaign_df, log_func, detected_currency, top_n=15):
-    log_func("\n\n============================================================");log_func(f"===== Top {top_n} Campañas Histórico (Orden: ROAS Desc) =====");log_func("============================================================")
-    group_cols=['Campaign']
-    essential_cols=group_cols+['spend','impr']
-    if df_daily_agg is None or df_daily_agg.empty or not all(c in df_daily_agg.columns for c in essential_cols):
-        log_func("   Faltan columnas esenciales para Top Campañas."); return
-    df=df_daily_agg.copy();
-    for col in group_cols:
-        if col in df.columns: df[col]=df[col].astype(str)
-    agg_dict={'spend':'sum','value':'sum','purchases':'sum','impr':'sum','reach':'sum','clicks':'sum'}
-    agg_dict_avail={k:v for k,v in agg_dict.items() if k in df.columns}
-    if not agg_dict_avail: log_func("   No hay métricas suficientes para Top Campañas."); return
-    agg=df.groupby(group_cols,as_index=False,observed=False).agg(agg_dict_avail)
-    if all(c in agg.columns for c in ['value','spend']): agg['roas']=safe_division(agg['value'],agg['spend'])
-    if all(c in agg.columns for c in ['clicks','impr']): agg['ctr']=safe_division_pct(agg['clicks'],agg['impr'])
-    if all(c in agg.columns for c in ['impr','reach']): agg['frequency']=safe_division(agg['impr'],agg['reach'])
-    if active_days_campaign_df is not None and not active_days_campaign_df.empty and 'Días_Activo_Total' in active_days_campaign_df.columns:
-        merge_cols=[c for c in group_cols if c in active_days_campaign_df.columns]
-        if merge_cols:
-            for col in merge_cols:
-                agg[col]=agg[col].astype(str)
-                active_days_campaign_df[col]=active_days_campaign_df[col].astype(str)
-            agg=pd.merge(agg,active_days_campaign_df[merge_cols+['Días_Activo_Total']],on=merge_cols,how='left')
-            agg['Días_Activo_Total']=agg['Días_Activo_Total'].fillna(0).astype(int)
-    if 'Días_Activo_Total' not in agg.columns: agg['Días_Activo_Total']=0
-    agg=agg[(agg['impr'].fillna(0)>0)&(agg['spend'].fillna(0)>0)].copy()
-    if agg.empty: log_func("   No hay Campañas con datos positivos."); return
-    sort_cols=['roas','spend'] if 'spend' in agg.columns else ['roas']
-    agg=agg.sort_values(by=sort_cols,ascending=[False]*len(sort_cols)).head(top_n)
-    headers=['Campaña','Días Act','Gasto','ROAS','Compras','CTR (%)','Frecuencia']
-    rows=[]
-    for _,r in agg.iterrows():
-        rows.append({'Campaña':r.get('Campaign','-'),'Días Act':fmt_int(r.get('Días_Activo_Total',0)),'Gasto':f"{detected_currency}{fmt_float(r.get('spend'),0)}",'ROAS':f"{fmt_float(r.get('roas'),2)}x",'Compras':fmt_int(r.get('purchases')),'CTR (%)':fmt_pct(r.get('ctr'),2),'Frecuencia':fmt_float(r.get('frequency'),2)})
-    if rows:
-        df_disp=pd.DataFrame(rows)
-        df_disp=df_disp[[h for h in headers if h in df_disp.columns]]
-        num_cols=[h for h in df_disp.columns if h not in ['Campaña']]
-        _format_dataframe_to_markdown(df_disp,f"** Top {top_n} Campañas por ROAS **",log_func,currency_cols=detected_currency,numeric_cols_for_alignment=num_cols)
-    else:
-        log_func("   No hay datos para Top Campañas.")
-
-def _generar_tabla_bitacora_entidad(entity_level, entity_name, df_daily_entity,
-                                   bitacora_periods_list, detected_currency, log_func, period_type="Weeks"):
-    original_locale = locale.getlocale(locale.LC_TIME) 
-    try:
-        locale_candidates = ['es_ES.UTF-8', 'es_ES', 'Spanish_Spain', 'Spanish']
-        locale_set = False
-        for loc_candidate in locale_candidates:
-            try:
-                locale.setlocale(locale.LC_TIME, loc_candidate)
-                # log_func(f"Locale para fechas (tabla entidad) configurado a: {loc_candidate}") # Comentado para reducir logs
-                locale_set = True
-                break
-            except locale.Error:
-                continue
-        if not locale_set:
-            log_func("Adv: No se pudo configurar el locale a español para nombres de meses en tabla entidad. Se usarán nombres en inglés por defecto.")
-    except Exception as e_locale_set:
-        log_func(f"Adv: Error al intentar configurar locale en tabla entidad: {e_locale_set}")
-
-    
-    header_label = entity_level.capitalize()
-    log_func(f"\n\n--------------------------------------------------------------------------------")
-    log_func(f" {header_label}: {entity_name} - Comparativa {'Semanal' if period_type == 'Weeks' else 'Mensual'}")
-    log_func(f"--------------------------------------------------------------------------------")
-
-    if df_daily_entity is None or df_daily_entity.empty or 'date' not in df_daily_entity.columns:
-        log_func("   No hay datos diarios para generar la tabla de bitácora.")
-        try: locale.setlocale(locale.LC_TIME, original_locale) 
-        except: pass
+        log_func("   Faltan columnas esenciales para Top AdSets.")
         return
-    if not bitacora_periods_list: 
-        log_func("   No se proporcionaron períodos para la bitácora.")
-        try: locale.setlocale(locale.LC_TIME, original_locale) 
-        except: pass
+    df = df_daily_agg.copy()
+    for col in group_cols:
+        if col in df.columns:
+            df[col] = df[col].astype(str)
+    agg_dict = {'spend': 'sum', 'value': 'sum', 'purchases': 'sum', 'impr': 'sum', 'reach': 'sum', 'clicks': 'sum'}
+    agg_dict_avail = {k: v for k, v in agg_dict.items() if k in df.columns}
+    if not agg_dict_avail:
+        log_func("   No hay métricas suficientes para Top AdSets.")
         return
-
-    results_by_period = {} 
-    period_labels_for_table = []     
-
-    log_func(f"  Calculando métricas para períodos ({'Semanas' if period_type == 'Weeks' else 'Meses'})...")
-    for i, (start_dt, end_dt, original_label_from_list) in enumerate(bitacora_periods_list): 
-        current_period_table_label = original_label_from_list 
-        period_labels_for_table.append(current_period_table_label)
-        
-        df_period_subset = df_daily_entity[ 
-            (df_daily_entity['date'] >= start_dt) & 
-            (df_daily_entity['date'] <= end_dt)
-        ].copy()
-        period_identifier_tuple = (start_dt.date(), end_dt.date()) 
-        results_by_period[original_label_from_list] = _calcular_metricas_agregadas_y_estabilidad(df_period_subset, period_identifier_tuple, log_func) 
-        # log_func(f"    -> Métricas para '{original_label_from_list}' calculadas ({results_by_period[original_label_from_list].get('date_range', 'N/A')}).") # Comentado para reducir logs
-
-    metric_map = {
-        'Inversion': {'display':'Inversion', 'formatter': lambda x: f"{detected_currency}{fmt_float(x, 2)}"},
-        'Ventas_Totales': {'display':'Ventas', 'formatter': lambda x: f"{detected_currency}{fmt_float(x, 2)}"},
-        'ROAS': {'display':'ROAS', 'formatter': lambda x: f"{fmt_float(x, 2)}x"},
-        'Compras': {'display':'Compras', 'formatter': fmt_int},
-        'CPA': {'display':'CPA', 'formatter': lambda x: f"{detected_currency}{fmt_float(x, 2)}"},
-        'Ticket_Promedio': {'display':'Ticket Prom.', 'formatter': lambda x: f"{detected_currency}{fmt_float(x, 2)}"},
-        'Impresiones': {'display':'Impresiones', 'formatter': fmt_int},
-        'Alcance': {'display':'Alcance', 'formatter': fmt_int},
-        'Frecuencia': {'display':'Frecuencia', 'formatter': lambda x: fmt_float(x, 2)},
-        'CPM': {'display':'CPM', 'formatter': lambda x: f"{detected_currency}{fmt_float(x, 2)}"},
-        'Clics': {'display':'Clics (Link)', 'formatter': fmt_int},
-        'CTR': {'display':'CTR (Link) %', 'formatter': lambda x: fmt_pct(x, 2)},
-        'Clics Salientes': {'display':'Clics (Out)', 'formatter': fmt_int}, 
-        'CTR Saliente': {'display':'CTR (Out) %', 'formatter': lambda x: fmt_pct(x, 2)}, 
-        'Visitas': {'display':'Visitas LP', 'formatter': fmt_int},
-        'LVP_Rate_%': {'display':'Tasa Visita LP %', 'formatter': lambda x: fmt_pct(x, 1)},
-        'Conv_Rate_%': {'display':'Tasa Compra %', 'formatter': lambda x: fmt_pct(x, 1)},
-        'Tiempo_Promedio': {'display':'Tiempo RV (s)', 'formatter': lambda x: fmt_float(x,1)}, 
-        'RV25_%': {'display': 'RV 25%','formatter': lambda x: fmt_pct(x, 1)},
-        'RV75_%': {'display': 'RV 75%','formatter': lambda x: fmt_pct(x, 1)},
-        'RV100_%': {'display': 'RV 100%','formatter': lambda x: fmt_pct(x, 1)},
-        'ROAS_Stability_%': {'display':'Est. ROAS %', 'formatter':fmt_stability}, 
-        'CPA_Stability_%': {'display':'Est. CPA %', 'formatter':fmt_stability},
-        'CPM_Stability_%': {'display':'Est. CPM %', 'formatter':fmt_stability},
-        'CTR_Stability_%': {'display':'Est. CTR %', 'formatter':fmt_stability},
-        'IMPR_Stability_%': {'display':'Est. Impr %', 'formatter':fmt_stability},
-        'CTR_DIV_FREQ_RATIO_Stability_%': {'display':'Est. CTR/Freq %', 'formatter':fmt_stability}
-    }
-    order = [ 
-        'Inversion', 'Ventas_Totales', 'ROAS', 'Compras', 'CPA', 'Ticket_Promedio',
-        'Impresiones', 'Alcance', 'Frecuencia', 'CPM',
-        'Clics', 'CTR', 'Clics Salientes', 'CTR Saliente', 'Visitas', 'LVP_Rate_%', 'Conv_Rate_%', 
-        'Tiempo_Promedio', 'RV25_%', 'RV75_%', 'RV100_%', 
-        'ROAS_Stability_%', 'CPA_Stability_%', 'CPM_Stability_%', 'CTR_Stability_%', 'IMPR_Stability_%', 'CTR_DIV_FREQ_RATIO_Stability_%' 
-    ]
-    headers = ["Métrica"] + period_labels_for_table 
+    agg = df.groupby(group_cols, as_index=False, observed=False).agg(agg_dict_avail)
+    if all(c in agg.columns for c in ['value', 'spend']):
+        agg['roas'] = safe_division(agg['value'], agg['spend'])
+    if all(c in agg.columns for c in ['clicks', 'impr']):
+        agg['ctr'] = safe_division_pct(agg['clicks'], agg['impr'])
+    if all(c in agg.columns for c in ['impr', 'reach']):
+        agg['frequency'] = safe_division(agg['impr'], agg['reach'])
+    if (
+        active_days_adset_df is not None
+        and not active_days_adset_df.empty
+        and 'Días_Activo_Total' in active_days_adset_df.columns
+    ):
+        merge_cols = [c for c in group_cols if c in active_days_adset_df.columns]
+        if merge_cols:
+            for col in merge_cols:
+                agg[col] = agg[col].astype(str)
+                active_days_adset_df[col] = active_days_adset_df[col].astype(str)
+            agg = pd.merge(agg, active_days_adset_df[merge_cols + ['Días_Activo_Total']], on=merge_cols, how='left')
+            agg['Días_Activo_Total'] = agg['Días_Activo_Total'].fillna(0).astype(int)
+    if 'Días_Activo_Total' not in agg.columns:
+        agg['Días_Activo_Total'] = 0
+    agg = agg[(agg['impr'].fillna(0) > 0) & (agg['spend'].fillna(0) > 0)].copy()
+    if agg.empty:
+        log_func("   No hay AdSets con datos positivos.")
+        return
+    sort_cols = ['roas', 'spend'] if 'spend' in agg.columns else ['roas']
+    agg = agg.sort_values(by=sort_cols, ascending=[False] * len(sort_cols)).head(top_n)
+    headers = ['Campaña', 'AdSet', 'Días Act', 'Gasto', 'ROAS', 'Compras', 'CTR (%)', 'Frecuencia']
     rows = []
-    stability_keys_map = {v['display']: k for k,v in metric_map.items() if 'Stability' in k} 
+    for _, r in agg.iterrows():
+        rows.append({
+            'Campaña': r.get('Campaign', '-'),
+            'AdSet': r.get('AdSet', '-'),
+            'Días Act': fmt_int(r.get('Días_Activo_Total', 0)),
+            'Gasto': f"{detected_currency}{fmt_float(r.get('spend'), 0)}",
+            'ROAS': f"{fmt_float(r.get('roas'), 2)}x",
+            'Compras': fmt_int(r.get('purchases')),
+            'CTR (%)': fmt_pct(r.get('ctr'), 2),
+            'Frecuencia': fmt_float(r.get('frequency'), 2),
+        })
+    if rows:
+        df_disp = pd.DataFrame(rows)
+        df_disp = df_disp[[h for h in headers if h in df_disp.columns]]
+        num_cols = [h for h in df_disp.columns if h not in ['Campaña', 'AdSet']]
+        _format_dataframe_to_markdown(df_disp, f"** Top {top_n} AdSets por ROAS **", log_func, currency_cols=detected_currency, numeric_cols_for_alignment=num_cols)
+    else:
+        log_func("   No hay datos para Top AdSets.")
 
-    for internal_key in order: 
-        info = metric_map.get(internal_key)
-        if not info: continue 
-        display_name = info['display'] 
-        fmt = info['formatter']        
-        row_vals = [display_name]      
-        is_stab_metric = 'Stability' in internal_key 
+def _generar_tabla_top_campaigns_historico(df_daily_agg, active_days_campaign_df, log_func, detected_currency, top_n=15):
+    log_func("\n\n============================================================")
+    log_func(f"===== Top {top_n} Campañas Histórico (Orden: ROAS Desc) =====")
+    log_func("============================================================")
+    group_cols = ['Campaign']
+    essential_cols = group_cols + ['spend', 'impr']
+    if df_daily_agg is None or df_daily_agg.empty or not all(c in df_daily_agg.columns for c in essential_cols):
+        log_func("   Faltan columnas esenciales para Top Campañas.")
+        return
+    df = df_daily_agg.copy()
+    for col in group_cols:
+        if col in df.columns:
+            df[col] = df[col].astype(str)
+    agg_dict = {'spend': 'sum', 'value': 'sum', 'purchases': 'sum', 'impr': 'sum', 'reach': 'sum', 'clicks': 'sum'}
+    agg_dict_avail = {k: v for k, v in agg_dict.items() if k in df.columns}
+    if not agg_dict_avail:
+        log_func("   No hay métricas suficientes para Top Campañas.")
+        return
+    agg = df.groupby(group_cols, as_index=False, observed=False).agg(agg_dict_avail)
+    if all(c in agg.columns for c in ['value', 'spend']):
+        agg['roas'] = safe_division(agg['value'], agg['spend'])
+    if all(c in agg.columns for c in ['clicks', 'impr']):
+        agg['ctr'] = safe_division_pct(agg['clicks'], agg['impr'])
+    if all(c in agg.columns for c in ['impr', 'reach']):
+        agg['frequency'] = safe_division(agg['impr'], agg['reach'])
+    if (
+        active_days_campaign_df is not None
+        and not active_days_campaign_df.empty
+        and 'Días_Activo_Total' in active_days_campaign_df.columns
+    ):
+        merge_cols = [c for c in group_cols if c in active_days_campaign_df.columns]
+        if merge_cols:
+            for col in merge_cols:
+                agg[col] = agg[col].astype(str)
+                active_days_campaign_df[col] = active_days_campaign_df[col].astype(str)
+            agg = pd.merge(agg, active_days_campaign_df[merge_cols + ['Días_Activo_Total']], on=merge_cols, how='left')
+            agg['Días_Activo_Total'] = agg['Días_Activo_Total'].fillna(0).astype(int)
+    if 'Días_Activo_Total' not in agg.columns:
+        agg['Días_Activo_Total'] = 0
+    agg = agg[(agg['impr'].fillna(0) > 0) & (agg['spend'].fillna(0) > 0)].copy()
+    if agg.empty:
+        log_func("   No hay Campañas con datos positivos.")
+        return
+    sort_cols = ['roas', 'spend'] if 'spend' in agg.columns else ['roas']
+    agg = agg.sort_values(by=sort_cols, ascending=[False] * len(sort_cols)).head(top_n)
+    headers = ['Campaña', 'Días Act', 'Gasto', 'ROAS', 'Compras', 'CTR (%)', 'Frecuencia']
+    rows = []
+    for _, r in agg.iterrows():
+        rows.append({
+            'Campaña': r.get('Campaign', '-'),
+            'Días Act': fmt_int(r.get('Días_Activo_Total', 0)),
+            'Gasto': f"{detected_currency}{fmt_float(r.get('spend'), 0)}",
+            'ROAS': f"{fmt_float(r.get('roas'), 2)}x",
+            'Compras': fmt_int(r.get('purchases')),
+            'CTR (%)': fmt_pct(r.get('ctr'), 2),
+            'Frecuencia': fmt_float(r.get('frequency'), 2),
+        })
+    if rows:
+        df_disp = pd.DataFrame(rows)
+        df_disp = df_disp[[h for h in headers if h in df_disp.columns]]
+        num_cols = [h for h in df_disp.columns if h not in ['Campaña']]
+        _format_dataframe_to_markdown(df_disp, f"** Top {top_n} Campañas por ROAS **", log_func, currency_cols=detected_currency, numeric_cols_for_alignment=num_cols)
+    else:
+        log_func("   No hay datos para Top Campañas.")
 
-        for i, (_, _, original_period_label) in enumerate(bitacora_periods_list): 
-            period_results = results_by_period.get(original_period_label) 
-            current_raw = period_results.get(internal_key, np.nan) if period_results else np.nan 
-
-            if is_stab_metric and (period_results is None or not period_results.get('is_complete', False)):
-                 formatted_val = '-'
-            else:
-                 formatted_val = fmt(current_raw) if pd.notna(current_raw) else '-'
-
-            var_vs_prev_fmt = '-' 
-            if not is_stab_metric and i < len(bitacora_periods_list) - 1: 
-                prev_original_label_for_comparison = bitacora_periods_list[i+1][2] 
-                prev_results_for_comparison = results_by_period.get(prev_original_label_for_comparison)
-                if prev_results_for_comparison:
-                    prev_raw_for_comparison = prev_results_for_comparison.get(internal_key, np.nan)
-                    var_vs_prev_fmt = variation(current_raw, prev_raw_for_comparison) 
-            
-            display_cell = f"{formatted_val}" 
-            if not is_stab_metric and var_vs_prev_fmt != '-': 
-                 display_cell += f" ({var_vs_prev_fmt})"
-
-            row_vals.append(display_cell) 
-
-        rows.append(row_vals) 
-
-    df_disp = pd.DataFrame(rows, columns=headers) 
-    numeric_cols_for_alignment = [h for h in headers if h != "Métrica"] 
-    stability_cols_display = list(stability_keys_map.keys()) 
-    _format_dataframe_to_markdown(df_disp, "", log_func, currency_cols=detected_currency,
-                                  stability_cols=stability_cols_display, 
-                                  numeric_cols_for_alignment=numeric_cols_for_alignment)
-
-    log_func("\n  **Nota aclaratoria:**")
-    log_func("  * **Semana actual / Mes actual:** Corresponde al periodo más reciente analizado (semana 0 o mes 0).")
-    log_func("  * **Xª semana anterior / Xº mes anterior:** Es la semana/mes inmediatamente previa (semana/mes –X).")
-    log_func("  * El análisis comparativo (valores en paréntesis con 🔺/🔻) se realiza siempre contra el período inmediatamente anterior mostrado en la tabla (columna a la derecha).")
-    log_func("\n  **Detalle de Cálculo de Métricas Clave (Bitácora):**")
-    log_func("  * **Inversión:** Suma del `Importe gastado` para el período.")
-    log_func("  * **Ventas Totales:** Suma del `Valor de conversión de compras` para el período.")
-    log_func("  * **ROAS (Retorno de la Inversión Publicitaria):** `Ventas Totales / Inversión`. Mide la rentabilidad de la publicidad.")
-    log_func("  * **Compras:** Suma de `Compras` para el período.")
-    log_func("  * **CPA (Costo por Adquisición/Compra):** `Inversión / Compras`. Costo promedio para generar una compra.")
-    log_func("  * **Ticket Promedio:** `Ventas Totales / Compras`. Valor promedio de cada compra.")
-    log_func("  * **Impresiones:** Suma de `Impresiones` para el período.")
-    log_func("  * **Alcance:** Suma del `Alcance` para el período (Nota: El alcance agregado puede no ser único si se suman datos de diferentes niveles sin dedup. Aquí se suma el alcance diario).")
-    log_func("  * **Frecuencia:** `Impresiones / Alcance`. Número promedio de veces que cada persona vio el anuncio.")
-    log_func("  * **CPM (Costo por Mil Impresiones):** `(Inversión / Impresiones) * 1000`. Costo de mostrar el anuncio mil veces.")
-    log_func("  * **Clics (Link):** Suma de `Clics en el enlace` para el período.")
-    log_func("  * **CTR (Link) % (Tasa de Clics en el Enlace) %:** `(Clics en el Enlace / Impresiones) * 100`. Porcentaje de impresiones que resultaron en un clic al enlace.")
-    log_func("  * **Clics (Out):** Suma de `Clics salientes` para el período.")
-    log_func("  * **CTR (Out) % (Tasa de Clics Salientes) %:** `(Clics Salientes / Impresiones) * 100`. Porcentaje de impresiones que resultaron en un clic que lleva fuera de la plataforma.")
-    log_func("  * **Visitas LP:** Suma de `Visitas a la página de destino` para el período.")
-    log_func("  * **Tasa Visita LP %:** `(Visitas a la Página de Destino / Clics en el Enlace) * 100`. Porcentaje de clics que resultaron en una carga de la página de destino.")
-    log_func("  * **Tasa Compra % (Tasa de Conversión de Compra):** `(Compras / Visitas a la Página de Destino) * 100`. Porcentaje de visitas a la LP que resultaron en una compra.")
-    log_func("  * **Tiempo RV (s) (Tiempo Promedio de Reproducción de Video):** Promedio del `Tiempo promedio de reproducción del video` diario.")
-    log_func("  * **% RV X% (Porcentaje de Reproducción de Video):** `(Reproducciones hasta X% / Base de Video) * 100`. La base es `Reproducciones de 3 segundos` si es > 0, sino `Impresiones`.")
-    log_func("  * **Estabilidad (%):** Mide la consistencia diaria de la métrica *dentro* del período de la columna. Un % alto indica estabilidad. Se calcula si el período tiene todos sus días con datos y cumple umbrales mínimos. Iconos: ✅ >= 50%, 🏆 >= 70%.")
-    log_func("  ---")
-    try: locale.setlocale(locale.LC_TIME, original_locale) 
- c0tc8c-codex/extend-metric_calculators-for-active-days
-    except: pass
 def _generar_tabla_bitacora_detallada(df_daily_agg, detected_currency, log_func, active_entities_df=None):
     """Genera una tabla diaria resumida para la bitácora."""
     log_func("\n\n============================================================")
@@ -1530,152 +1158,32 @@ def _generar_tabla_bitacora_detallada(df_daily_agg, detected_currency, log_func,
         'rv25_pct': 'RV25_%',
         'rv75_pct': 'RV75_%',
         'rv100_pct': 'RV100_%',
-        'rtime': 'Tiempo_Promedio'
+        'rtime': 'Tiempo_Promedio',
     }
-    df_disp.rename(columns={k:v for k,v in rename_map.items() if k in df_disp.columns}, inplace=True)
+    df_disp.rename(columns={k: v for k, v in rename_map.items() if k in df_disp.columns}, inplace=True)
 
-    ordered_cols = [c for c in ['Fecha','Campañas_Activas','AdSets_Activos','Ads_Activos','Inversion','Ventas_Totales','Compras','ROAS','CPA','Impresiones','Alcance','Frecuencia','CPM','Clics','CTR','Clics Salientes','CTR Saliente','Visitas','LVP_Rate_%','Conv_Rate_%','RV3','RV25','RV75','RV100','RV25_%','RV75_%','RV100_%','Tiempo_Promedio'] if c in df_disp.columns]
+    ordered_cols = [c for c in [
+        'Fecha','Campañas_Activas','AdSets_Activos','Ads_Activos','Inversion','Ventas_Totales','Compras','ROAS','CPA','Impresiones','Alcance','Frecuencia','CPM','Clics','CTR','Clics Salientes','CTR Saliente','Visitas','LVP_Rate_%','Conv_Rate_%','RV3','RV25','RV75','RV100','RV25_%','RV75_%','RV100_%','Tiempo_Promedio'
+    ] if c in df_disp.columns]
     if ordered_cols:
         df_disp = df_disp[ordered_cols]
 
-    int_cols = [c for c in ['Campañas_Activas','AdSets_Activos','Ads_Activos','Impresiones','Alcance','Clics','Clics Salientes','Visitas','Compras','RV3','RV25','RV75','RV100'] if c in df_disp.columns]
-    pct_cols = {c:1 for c in ['CTR','CTR Saliente','LVP_Rate_%','Conv_Rate_%','RV25_%','RV75_%','RV100_%'] if c in df_disp.columns}
-    float_cols = {c:2 for c in ['Frecuencia','ROAS','CPA','CPM'] if c in df_disp.columns}
+    int_cols = [c for c in [
+        'Campañas_Activas','AdSets_Activos','Ads_Activos','Impresiones','Alcance','Clics','Clics Salientes','Visitas','Compras','RV3','RV25','RV75','RV100'
+    ] if c in df_disp.columns]
+    pct_cols = {c: 1 for c in ['CTR','CTR Saliente','LVP_Rate_%','Conv_Rate_%','RV25_%','RV75_%','RV100_%'] if c in df_disp.columns}
+    float_cols = {c: 2 for c in ['Frecuencia','ROAS','CPA','CPM'] if c in df_disp.columns}
     if 'Tiempo_Promedio' in df_disp.columns:
         float_cols['Tiempo_Promedio'] = 1
 
     numeric_cols = [c for c in df_disp.columns if c != 'Fecha']
-    _format_dataframe_to_markdown(df_disp, "", log_func, float_cols_fmt=float_cols, int_cols=int_cols, pct_cols_fmt=pct_cols, currency_cols=detected_currency, numeric_cols_for_alignment=numeric_cols)
-
-    except: pass
-def _generar_tabla_bitacora_detallada(df_daily_agg, detected_currency, log_func, active_entities_df=None):
-    """Genera una tabla diaria resumida para la bitácora."""
-    log_func("\n\n============================================================")
-    log_func("===== Bitácora Detallada por Día =====")
-    log_func("============================================================")
-    if df_daily_agg is None or df_daily_agg.empty or 'date' not in df_daily_agg.columns or df_daily_agg['date'].dropna().empty:
-        log_func("No hay datos diarios para la Bitácora Detallada.")
-        return
-    df_disp = df_daily_agg.copy()
-    if active_entities_df is not None and not active_entities_df.empty and 'date' in active_entities_df.columns:
-        try:
-            ae_df = active_entities_df.copy()
-            if not pd.api.types.is_datetime64_any_dtype(ae_df['date']):
-                ae_df['date'] = pd.to_datetime(ae_df['date'], errors='coerce')
-            df_disp = pd.merge(df_disp, ae_df, on='date', how='left')
-        except Exception as e_merge:
-            log_func(f"Adv: No se pudo fusionar entidades activas por día: {e_merge}")
-    try:
-        df_disp = df_disp[df_disp['date'].notna()].copy()
-        df_disp['date'] = pd.to_datetime(df_disp['date']).dt.strftime('%d/%m/%Y')
-    except Exception:
-        pass
-
-    rename_map = {
-        'date': 'Fecha',
-        'spend': 'Inversion',
-        'value': 'Ventas_Totales',
-        'purchases': 'Compras',
-        'clicks': 'Clics',
-        'clicks_out': 'Clics Salientes',
-        'impr': 'Impresiones',
-        'reach': 'Alcance',
-        'visits': 'Visitas',
-        'frequency': 'Frecuencia',
-        'cpm': 'CPM',
-        'ctr': 'CTR',
-        'ctr_out': 'CTR Saliente',
-        'roas': 'ROAS',
-        'cpa': 'CPA',
-        'lpv_rate': 'LVP_Rate_%',
-        'purchase_rate': 'Conv_Rate_%',
-        'rv3': 'RV3',
-        'rv25': 'RV25',
-        'rv75': 'RV75',
-        'rv100': 'RV100',
-        'rv25_pct': 'RV25_%',
-        'rv75_pct': 'RV75_%',
-        'rv100_pct': 'RV100_%',
-        'rtime': 'Tiempo_Promedio'
-    }
-    df_disp.rename(columns={k:v for k,v in rename_map.items() if k in df_disp.columns}, inplace=True)
-
-    ordered_cols = [c for c in ['Fecha','Campañas_Activas','AdSets_Activos','Ads_Activos','Inversion','Ventas_Totales','Compras','ROAS','CPA','Impresiones','Alcance','Frecuencia','CPM','Clics','CTR','Clics Salientes','CTR Saliente','Visitas','LVP_Rate_%','Conv_Rate_%','RV3','RV25','RV75','RV100','RV25_%','RV75_%','RV100_%','Tiempo_Promedio'] if c in df_disp.columns]
-    if ordered_cols:
-        df_disp = df_disp[ordered_cols]
-
-    int_cols = [c for c in ['Campañas_Activas','AdSets_Activos','Ads_Activos','Impresiones','Alcance','Clics','Clics Salientes','Visitas','Compras','RV3','RV25','RV75','RV100'] if c in df_disp.columns]
-    pct_cols = {c:1 for c in ['CTR','CTR Saliente','LVP_Rate_%','Conv_Rate_%','RV25_%','RV75_%','RV100_%'] if c in df_disp.columns}
-    float_cols = {c:2 for c in ['Frecuencia','ROAS','CPA','CPM'] if c in df_disp.columns}
-    if 'Tiempo_Promedio' in df_disp.columns:
-        float_cols['Tiempo_Promedio'] = 1
-
-    numeric_cols = [c for c in df_disp.columns if c != 'Fecha']
-    _format_dataframe_to_markdown(df_disp, "", log_func, float_cols_fmt=float_cols, int_cols=int_cols, pct_cols_fmt=pct_cols, currency_cols=detected_currency, numeric_cols_for_alignment=numeric_cols)
-
-    except: pass
-def _generar_tabla_bitacora_detallada(df_daily_agg, detected_currency, log_func, active_entities_df=None):
-    """Genera una tabla diaria resumida para la bitácora."""
-    log_func("\n\n============================================================")
-    log_func("===== Bitácora Detallada por Día =====")
-    log_func("============================================================")
-    if df_daily_agg is None or df_daily_agg.empty or 'date' not in df_daily_agg.columns or df_daily_agg['date'].dropna().empty:
-        log_func("No hay datos diarios para la Bitácora Detallada.")
-        return
-    df_disp = df_daily_agg.copy()
-    if active_entities_df is not None and not active_entities_df.empty and 'date' in active_entities_df.columns:
-        try:
-            ae_df = active_entities_df.copy()
-            if not pd.api.types.is_datetime64_any_dtype(ae_df['date']):
-                ae_df['date'] = pd.to_datetime(ae_df['date'], errors='coerce')
-            df_disp = pd.merge(df_disp, ae_df, on='date', how='left')
-        except Exception as e_merge:
-            log_func(f"Adv: No se pudo fusionar entidades activas por día: {e_merge}")
-    try:
-        df_disp = df_disp[df_disp['date'].notna()].copy()
-        df_disp['date'] = pd.to_datetime(df_disp['date']).dt.strftime('%d/%m/%Y')
-    except Exception:
-        pass
-
-    rename_map = {
-        'date': 'Fecha',
-        'spend': 'Inversion',
-        'value': 'Ventas_Totales',
-        'purchases': 'Compras',
-        'clicks': 'Clics',
-        'clicks_out': 'Clics Salientes',
-        'impr': 'Impresiones',
-        'reach': 'Alcance',
-        'visits': 'Visitas',
-        'frequency': 'Frecuencia',
-        'cpm': 'CPM',
-        'ctr': 'CTR',
-        'ctr_out': 'CTR Saliente',
-        'roas': 'ROAS',
-        'cpa': 'CPA',
-        'lpv_rate': 'LVP_Rate_%',
-        'purchase_rate': 'Conv_Rate_%',
-        'rv3': 'RV3',
-        'rv25': 'RV25',
-        'rv75': 'RV75',
-        'rv100': 'RV100',
-        'rv25_pct': 'RV25_%',
-        'rv75_pct': 'RV75_%',
-        'rv100_pct': 'RV100_%',
-        'rtime': 'Tiempo_Promedio'
-    }
-    df_disp.rename(columns={k:v for k,v in rename_map.items() if k in df_disp.columns}, inplace=True)
-
-    ordered_cols = [c for c in ['Fecha','Campañas_Activas','AdSets_Activos','Ads_Activos','Inversion','Ventas_Totales','Compras','ROAS','CPA','Impresiones','Alcance','Frecuencia','CPM','Clics','CTR','Clics Salientes','CTR Saliente','Visitas','LVP_Rate_%','Conv_Rate_%','RV3','RV25','RV75','RV100','RV25_%','RV75_%','RV100_%','Tiempo_Promedio'] if c in df_disp.columns]
-    if ordered_cols:
-        df_disp = df_disp[ordered_cols]
-
-    int_cols = [c for c in ['Campañas_Activas','AdSets_Activos','Ads_Activos','Impresiones','Alcance','Clics','Clics Salientes','Visitas','Compras','RV3','RV25','RV75','RV100'] if c in df_disp.columns]
-    pct_cols = {c:1 for c in ['CTR','CTR Saliente','LVP_Rate_%','Conv_Rate_%','RV25_%','RV75_%','RV100_%'] if c in df_disp.columns}
-    float_cols = {c:2 for c in ['Frecuencia','ROAS','CPA','CPM'] if c in df_disp.columns}
-    if 'Tiempo_Promedio' in df_disp.columns:
-        float_cols['Tiempo_Promedio'] = 1
-
-    numeric_cols = [c for c in df_disp.columns if c != 'Fecha']
-    _format_dataframe_to_markdown(df_disp, "", log_func, float_cols_fmt=float_cols, int_cols=int_cols, pct_cols_fmt=pct_cols, currency_cols=detected_currency, numeric_cols_for_alignment=numeric_cols)
- main
+    _format_dataframe_to_markdown(
+        df_disp,
+        "",
+        log_func,
+        float_cols_fmt=float_cols,
+        int_cols=int_cols,
+        pct_cols_fmt=pct_cols,
+        currency_cols=detected_currency,
+        numeric_cols_for_alignment=numeric_cols,
+    )
