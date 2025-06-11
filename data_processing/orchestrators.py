@@ -26,6 +26,22 @@ except ImportError:
 from config import numeric_internal_cols
 from formatting_utils import safe_division, safe_division_pct
 
+# Funciones principales de los otros módulos de data_processing
+from .loaders import _cargar_y_preparar_datos
+from .aggregators import _agregar_datos_diarios
+from .metric_calculators import (
+    _calcular_dias_activos_totales,
+    _calcular_entidades_activas_por_dia,
+)
+from .report_sections import (
+    _generar_tabla_bitacora_detallada,
+    _generar_tabla_bitacora_entidad,
+    _generar_tabla_embudo_bitacora,
+    _generar_tabla_top_ads_historico,
+    _generar_tabla_top_adsets_historico,
+    _generar_tabla_top_campaigns_historico,
+)
+
 # Variable global para mensajes de resumen
 log_summary_messages_orchestrator = []
 
