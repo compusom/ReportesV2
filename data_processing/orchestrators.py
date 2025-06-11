@@ -21,17 +21,6 @@ except ImportError:
         "ADVERTENCIA (orchestrators.py): python-dateutil no encontrado. Funcionalidad de Bitácora Mensual podría fallar."
     )
 
-# Importaciones relativas del paquete (versión limpia y sin duplicados)
-from .loaders import _cargar_y_preparar_datos
-from .aggregators import _agregar_datos_diarios
-from .metric_calculators import _calcular_dias_activos_totales, _calcular_entidades_activas_por_dia
-from .report_sections import (
-    _generar_tabla_vertical_global, _generar_tabla_vertical_entidad,
-    _generar_tabla_embudo_rendimiento, _generar_tabla_embudo_bitacora,
-    _generar_analisis_ads, _generar_tabla_top_ads_historico,
-    _generar_tabla_top_adsets_historico, _generar_tabla_top_campaigns_historico,
-    _generar_tabla_bitacora_entidad, _generar_tabla_bitacora_detallada,
-)
 
 # Importaciones de módulos en la raíz del proyecto
 from config import numeric_internal_cols
@@ -93,8 +82,7 @@ def procesar_reporte_rendimiento(input_files, output_dir, output_filename, statu
             
             # (Aquí irían las llamadas al resto de las secciones del reporte de rendimiento)
 
-            log("\n\n============================================================")
-            log("===== Resumen del Proceso =====")
+
             log("============================================================")
             if log_summary_messages_orchestrator:
                 for msg in log_summary_messages_orchestrator:
@@ -103,6 +91,7 @@ def procesar_reporte_rendimiento(input_files, output_dir, output_filename, statu
             log("============================================================")
             log("\n\n--- FIN DEL REPORTE RENDIMIENTO ---", importante=True)
             status_queue.put("---DONE---")
+
 
     except Exception as e_main:
         error_details = traceback.format_exc()
@@ -130,7 +119,7 @@ def procesar_reporte_bitacora(input_files, output_dir, output_filename, status_q
         output_path = os.path.join(output_dir, output_filename)
         with open(output_path, 'w', encoding='utf-8') as f_out:
             log_file_handler = f_out
-            log = _crear_logger_con_resumen(log_file_handler, status_queue)
+
 
             try:
                 locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
@@ -160,7 +149,7 @@ def procesar_reporte_bitacora(input_files, output_dir, output_filename, status_q
             active_days_adset = active_days_results.get('AdSet', pd.DataFrame())
             active_days_ad = active_days_results.get('Anuncio', pd.DataFrame())
             active_entities_daily = _calcular_entidades_activas_por_dia(df_combined)
-            log("Cálculo de días y entidades activas OK.")
+
 
             # --- Generación de Secciones del Reporte ---
             _generar_tabla_bitacora_detallada(df_daily_agg_full, detected_currency, log, active_entities_df=active_entities_daily)
@@ -183,9 +172,7 @@ def procesar_reporte_bitacora(input_files, output_dir, output_filename, status_q
             # ... (fin placeholder)
 
             if not bitacora_periods_list:
-                log("No se pudieron definir períodos para la Bitácora.", importante=True)
-                status_queue.put("---ERROR---")
-                return
+
 
             # Calcular métricas y generar tablas de resumen
             df_daily_total_for_bitacora = df_daily_agg_full.groupby('date', as_index=False, observed=True).sum(numeric_only=True)
@@ -207,6 +194,7 @@ def procesar_reporte_bitacora(input_files, output_dir, output_filename, status_q
                 for msg in log_summary_messages_orchestrator:
                     clean_msg = re.sub(r'^\s*\[\d{2}:\d{2}:\d{2}\]\s*', '', msg).strip().replace('---', '-')
                     log(f"  - {clean_msg}")
+
             log("============================================================")
             log(f"\n\n--- FIN DEL REPORTE BITÁCORA ({bitacora_comparison_type}) ---", importante=True)
             status_queue.put("---DONE---")
