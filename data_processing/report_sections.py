@@ -465,7 +465,27 @@ def _generar_tabla_embudo_rendimiento(df_daily_agg, periods_numeric, log_func, d
     log_func("  * _Nota:_ La disponibilidad de pasos como Clics Salientes, Atención, Interés y Deseo depende de si estos datos están presentes en los archivos de origen."); log_func("  ---")
 
 
-def _generar_tabla_embudo_bitacora(df_daily_agg, bitacora_periods_list, log_func, detected_currency, period_type="Weeks"):
+def _generar_tabla_embudo_bitacora(
+    df_daily_agg,
+    bitacora_periods_list,
+    log_func,
+    detected_currency,
+    period_type="Weeks",
+):
+    """Genera el análisis de embudo para la bitácora.
+
+    ``period_type`` puede recibirse como "Weekly"/"Monthly". Normalizamos estos
+    valores a "Weeks" o "Months" para compatibilidad con la lógica existente.
+    """
+
+    period_type_norm = str(period_type or "").strip().lower()
+    if period_type_norm in ("weekly", "weeks"):
+        period_type_final = "Weeks"
+    elif period_type_norm in ("monthly", "months"):
+        period_type_final = "Months"
+    else:
+        period_type_final = "Weeks"
+
     original_locale = locale.getlocale(locale.LC_TIME)
     try:
         locale_candidates = ['es_ES.UTF-8', 'es_ES', 'Spanish_Spain', 'Spanish']
@@ -484,7 +504,7 @@ def _generar_tabla_embudo_bitacora(df_daily_agg, bitacora_periods_list, log_func
 
 
     log_func("\n\n============================================================")
-    title_comp = "Semanal" if period_type == "Weeks" else "Mensual"
+    title_comp = "Semanal" if period_type_final == "Weeks" else "Mensual"
     log_func(f"===== Análisis de Embudo - Comparativa {title_comp} =====")
     log_func("============================================================")
 
@@ -592,7 +612,9 @@ def _generar_tabla_embudo_bitacora(df_daily_agg, bitacora_periods_list, log_func
     
     log_func("\n  **Detalle de Métricas (Embudo de Bitácora):**");
     log_func(f"  * **Paso del Embudo:** Etapa del proceso de conversión (datos agregados de cuenta completa).")
-    log_func(f"  * **Columnas ({'Semana actual, Xª semana anterior' if period_type == 'Weeks' else 'Mes actual, Xº mes anterior'}):** Muestran el valor *Real* acumulado para esa etapa en el período indicado.")
+    log_func(
+        f"  * **Columnas ({'Semana actual, Xª semana anterior' if period_type_final == 'Weeks' else 'Mes actual, Xº mes anterior'}):** Muestran el valor *Real* acumulado para esa etapa en el período indicado."
+    )
     log_func(f"  * **% Paso ({'Semana/Mes'}):** Es la tasa de conversión de esta etapa con respecto a la etapa *anterior en el embudo* (ej. Clics/Impresiones) DENTRO DEL MISMO PERÍODO. La Flecha (🔺/🔻) indica si este porcentaje de paso es mayor o menor que el 100%. '-' para el primer paso.");
     log_func("  ---")
     try: locale.setlocale(locale.LC_TIME, original_locale) 
@@ -1189,12 +1211,33 @@ def _generar_tabla_bitacora_detallada(df_daily_agg, detected_currency, log_func,
     )
 
 
-def _generar_tabla_bitacora_entidad(entity_level, entity_name, df_daily_entity, bitacora_periods_list, detected_currency, log_func, period_type="Weeks"):
-    """Wrapper que mantiene compatibilidad con versiones previas."""
+def _generar_tabla_bitacora_entidad(
+    entity_level,
+    entity_name,
+    df_daily_entity,
+    bitacora_periods_list,
+    detected_currency,
+    log_func,
+    period_type="Weeks",
+):
+    """Wrapper que mantiene compatibilidad con versiones previas.
+
+    ``period_type`` puede recibirse como "Weekly"/"Monthly" desde el
+    ``orchestrator``. Este helper normaliza esos valores a los identificadores
+    usados internamente ("Weeks"/"Months").
+    """
     if df_daily_entity is None or df_daily_entity.empty or "date" not in df_daily_entity.columns:
         log_func("No hay datos diarios para generar la tabla de bitácora.")
         return
     df_local = df_daily_entity.copy()
+
+    period_type_norm = str(period_type or "").strip().lower()
+    if period_type_norm in ("weekly", "weeks"):
+        period_type_final = "Weeks"
+    elif period_type_norm in ("monthly", "months"):
+        period_type_final = "Months"
+    else:
+        period_type_final = "Days" if period_type_norm == "days" else period_type
     if not pd.api.types.is_datetime64_any_dtype(df_local["date"]):
         df_local["date"] = pd.to_datetime(df_local["date"], errors="coerce")
     df_local = df_local[df_local["date"].notna()].copy()
@@ -1213,7 +1256,7 @@ def _generar_tabla_bitacora_entidad(entity_level, entity_name, df_daily_entity, 
         bitacora_periods_list,
         detected_currency,
         log_func,
-        period_type=period_type,
+        period_type=period_type_final,
     )
 
 

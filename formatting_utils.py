@@ -55,40 +55,98 @@ def format_step_pct(value):
 
 # --- ESTAS SON LAS FUNCIONES IMPORTANTES QUE FALTAN O TIENEN ERROR DE NOMBRE ---
 def safe_division(n_input, d_input):
-    n = pd.to_numeric(n_input, errors='coerce')
-    d = pd.to_numeric(d_input, errors='coerce')
-    return_scalar = not isinstance(n_input, (pd.Series, np.ndarray)) and \
-                    not isinstance(d_input, (pd.Series, np.ndarray))
+    """Divide ``n_input`` by ``d_input`` safely returning ``NaN`` on invalid
+    operations.
+
+    This helper works with scalars, ``pd.Series`` and ``numpy`` arrays.  If the
+    denominator is zero, ``NaN`` is returned instead of raising an error.
+    """
+
+    def _convert(val):
+        if isinstance(val, pd.Series):
+            return pd.to_numeric(val.apply(robust_numeric_conversion), errors="coerce")
+        elif isinstance(val, np.ndarray):
+            return pd.to_numeric(pd.Series(val).apply(robust_numeric_conversion), errors="coerce").to_numpy()
+        else:
+            return pd.to_numeric(robust_numeric_conversion(val), errors="coerce")
+
+    n = _convert(n_input)
+    d = _convert(d_input)
+
+    return_scalar = np.isscalar(n_input) and np.isscalar(d_input)
+
     mask = pd.notna(n) & pd.notna(d) & np.isfinite(n) & np.isfinite(d) & (abs(d) > 1e-9)
-    result_values = np.where(mask, n / d, np.nan)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        result_values = np.divide(
+            n,
+            d,
+            out=np.full_like(n, np.nan, dtype=float),
+            where=mask,
+        )
+
     if return_scalar:
-        try: return result_values.item()
-        except IndexError: return np.nan
-        except ValueError: return result_values[0].item() if result_values.size > 0 else np.nan
+        try:
+            return result_values.item()
+        except Exception:
+            return np.nan
     else:
-        index = n_input.index if isinstance(n_input, pd.Series) else \
-                (d_input.index if isinstance(d_input, pd.Series) else None)
-        name = (n_input.name + "_div" if isinstance(n_input, pd.Series) and n_input.name else
-                (d_input.name + "_denom_div" if isinstance(d_input, pd.Series) and d_input.name else None))
-        return pd.Series(result_values.flatten(), index=index, name=name)
+        index = (
+            n_input.index
+            if isinstance(n_input, pd.Series)
+            else (d_input.index if isinstance(d_input, pd.Series) else None)
+        )
+        name = (
+            n_input.name + "_div"
+            if isinstance(n_input, pd.Series) and n_input.name
+            else (d_input.name + "_denom_div" if isinstance(d_input, pd.Series) and d_input.name else None)
+        )
+        return pd.Series(np.asarray(result_values).reshape(-1), index=index, name=name)
 
 def safe_division_pct(n_input, d_input):
-    n = pd.to_numeric(n_input, errors='coerce')
-    d = pd.to_numeric(d_input, errors='coerce')
-    return_scalar = not isinstance(n_input, (pd.Series, np.ndarray)) and \
-                    not isinstance(d_input, (pd.Series, np.ndarray))
+    """Percentage version of :func:`safe_division`. Returns ``NaN`` when the
+    denominator is zero or invalid."""
+
+    def _convert(val):
+        if isinstance(val, pd.Series):
+            return pd.to_numeric(val.apply(robust_numeric_conversion), errors="coerce")
+        elif isinstance(val, np.ndarray):
+            return pd.to_numeric(pd.Series(val).apply(robust_numeric_conversion), errors="coerce").to_numpy()
+        else:
+            return pd.to_numeric(robust_numeric_conversion(val), errors="coerce")
+
+    n = _convert(n_input)
+    d = _convert(d_input)
+
+    return_scalar = np.isscalar(n_input) and np.isscalar(d_input)
+
     mask = pd.notna(n) & pd.notna(d) & np.isfinite(n) & np.isfinite(d) & (abs(d) > 1e-9)
-    result_values = np.where(mask, (n / d) * 100, np.nan)
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        result_values = np.divide(
+            n,
+            d,
+            out=np.full_like(n, np.nan, dtype=float),
+            where=mask,
+        ) * 100
+
     if return_scalar:
-        try: return result_values.item()
-        except IndexError: return np.nan
-        except ValueError: return result_values[0].item() if result_values.size > 0 else np.nan
+        try:
+            return result_values.item()
+        except Exception:
+            return np.nan
     else:
-        index = n_input.index if isinstance(n_input, pd.Series) else \
-                (d_input.index if isinstance(d_input, pd.Series) else None)
-        name = (n_input.name + "_pct" if isinstance(n_input, pd.Series) and n_input.name else
-                (d_input.name + "_denom_pct" if isinstance(d_input, pd.Series) and d_input.name else None))
-        return pd.Series(result_values.flatten(), index=index, name=name)
+        index = (
+            n_input.index
+            if isinstance(n_input, pd.Series)
+            else (d_input.index if isinstance(d_input, pd.Series) else None)
+        )
+        name = (
+            n_input.name + "_pct"
+            if isinstance(n_input, pd.Series) and n_input.name
+            else (d_input.name + "_denom_pct" if isinstance(d_input, pd.Series) and d_input.name else None)
+        )
+        return pd.Series(np.asarray(result_values).reshape(-1), index=index, name=name)
 # --- FIN DE FUNCIONES IMPORTANTES ---
 
 def _format_dataframe_to_markdown(df, title, log_func, float_cols_fmt={}, int_cols=[], pct_cols_fmt={}, currency_cols={}, stability_cols=[], default_prec=2, max_col_width=None, numeric_cols_for_alignment=[]):
