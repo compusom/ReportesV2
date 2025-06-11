@@ -119,7 +119,7 @@ def procesar_reporte_bitacora(input_files, output_dir, output_filename, status_q
         output_path = os.path.join(output_dir, output_filename)
         with open(output_path, 'w', encoding='utf-8') as f_out:
             log_file_handler = f_out
-
+            log = _crear_logger_con_resumen(log_file_handler, status_queue)
 
             try:
                 locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
